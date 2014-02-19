@@ -6,7 +6,7 @@ Hard-coded for 32bit unsigned numbers.
 \nAuthor: Jason Manley, Feb 2011.
 '''
 
-import corr,time,numpy,struct,sys,logging,ratty2,cal,conf,iniparse, os
+import corr,time,numpy,struct,sys,logging,ratty2,cal,conf,iniparse,os,valon_synth,socket
 
 
 class spec:
@@ -277,19 +277,41 @@ class spec:
         #print '0x%08X\n'%bitmap
         self.fpga.write_int('rf_ctrl0',bitmap)
 
-
+    def set_valon(self):        
+        HOST = '192.168.14.76'  # The remote host
+        PORT = 7148             # The same port as used by the server 
+        
+        socket._socketobject.read = socket._socketobject.recv
+        socket._socketobject.write = socket._socketobject.send
+        
+        s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        s.connect((HOST, PORT))
+        
+        valon = valon_synth.Synthesizer(s)                
+        valon.set_frequency(valon_synth.SYNTH_A,self.config['sample_clk']/1e6)
+	time.sleep(3)
+	valon.set_frequency(valon_synth.SYNTH_B,self.config['sample_clk']/1e6)
+        
     def initialise(self,skip_program=False, clk_check=False, input_sel='Q',print_progress=False):
         """Initialises the system to defaults."""
         if print_progress:
             print '\tProgramming FPGA...',
             sys.stdout.flush()
         if not skip_program:
-            self.fpga.upload_bof('/etc/ratty2/boffiles/'+self.config['bitstream'],3333)
+            self.fpga.upload_program_bof('/etc/ratty2/boffiles/'+self.config['bitstream'],3333)
             #time.sleep(3)
             self.fpga.progdev(self.config['bitstream'])
             if print_progress: print 'ok'
         elif print_progress: print 'skipped'
-               
+        
+        """Set the Valon synthesizer frequency to sample clock."""
+        if print_progress: 
+            print '\tConfiguring Valon frequency to %5.1f MHz sample clock...'%(self.config['sample_clk']/1e6),
+            sys.stdout.flush()
+            
+        self.set_valon()
+        if print_progress: print 'ok'   
+            
         if clk_check: 
             if print_progress:
                 print '\tChecking clocks...',
