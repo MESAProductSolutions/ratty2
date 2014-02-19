@@ -277,20 +277,23 @@ class spec:
         #print '0x%08X\n'%bitmap
         self.fpga.write_int('rf_ctrl0',bitmap)
 
-    def set_valon(self):        
-        HOST = '192.168.14.76'  # The remote host
+    def set_valon(self,freq=None):        
+        "Configures Valon synth attached to ROACH2 ser2net gateway on port 7148."
         PORT = 7148             # The same port as used by the server 
-        
         socket._socketobject.read = socket._socketobject.recv
         socket._socketobject.write = socket._socketobject.send
-        
         s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        s.connect((HOST, PORT))
+        s.settimeout(2)
+        s.connect((self.config['roach_ip_str'], PORT))
         
         valon = valon_synth.Synthesizer(s)                
-        valon.set_frequency(valon_synth.SYNTH_A,self.config['sample_clk']/1e6)
-	time.sleep(3)
-	valon.set_frequency(valon_synth.SYNTH_B,self.config['sample_clk']/1e6)
+        if freq==None:
+            freq=self.config['sample_clk']
+        valon.set_frequency(valon_synth.SYNTH_A,freq/1.e6)
+        time.sleep(3)
+        valon.set_frequency(valon_synth.SYNTH_B,freq/1.e6)
+        time.sleep(3)
+        s.close()
         
     def initialise(self,skip_program=False, clk_check=False, input_sel='Q',print_progress=False):
         """Initialises the system to defaults."""
