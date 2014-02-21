@@ -263,18 +263,14 @@ class spec:
         self.config['band_sel']=rf_band
         self.logger.info("Selected RF band %i."%rf_band)
 
-        self.config['rf_attens']=self._rf_atten_calc(gain)
-        self.config['rf_gain']=self.config['fe_amp']
-        self.config['rf_atten']=0.0
+        #self.config['rf_atten']=0.0
+        #    self.config['rf_atten']+=atten
+        #        self.config['rf_gain']+=atten
+        #print '0x%08X\n'%bitmap
+        self.cal.update_atten_bandpass(gain=self.cal._rf_atten_calc(gain))
         for (att,atten) in enumerate(self.config['rf_attens']):
             bitmap+=(~(int(-atten*2)))<<(8+(6*int(att))) #6 bits each, following on from above rf_band_select.
-            self.logger.info("Set attenuator %i to %3.1f"%(att,atten))
-            self.config['rf_atten']+=atten
-            if self.config['rf_atten_gain_calfiles'][att] != 'none':
-                self.config['rf_gain']+=self.get_interpolated_attens(fileName=self.config['rf_atten_gain_calfiles'][att],setpoint=atten)
-            else:
-                self.config['rf_gain']+=atten
-        #print '0x%08X\n'%bitmap
+            self.logger.info("Setting attenuator %i to %3.1f"%(att,atten))
         self.fpga.write_int('rf_ctrl0',bitmap)
 
     def set_valon(self,freq=None):        
@@ -327,7 +323,7 @@ class spec:
         self.fe_set()
         if print_progress: print 'ok: %3.1fdb total (%2.1fdb, %2.1fdB, %2.1fdB)'%(self.config['rf_atten'],self.config['rf_attens'][0],self.config['rf_attens'][1],self.config['rf_attens'][2])
 
-        if print_progress: print '\tTotal frontend gain: %3.1fdb'%(self.config['rf_gain'])
+        if print_progress: print '\tTotal frontend gain: %3.1fdb'%(self.config['fe_amp']+numpy.sum(numpy.mean(self.config['rf_atten_bandpasses'],axis=1)))
     
         if print_progress:
             print '\tConfiguring FFT shift schedule...',
@@ -412,7 +408,9 @@ class spec:
         #print '\t\tMean adc_v scale: %f'%numpy.mean(cal_spectrum)
         cal_spectrum  = 10*numpy.log10(cal_spectrum)
         #print '\t\tMean log: %f'%numpy.mean(cal_spectrum)
-        cal_spectrum -= self.config['rf_gain']
+        #TODO Fix this to use attenuator bandpass calibrations:
+        cal_spectrum -= self.config['fe_amp']
+        cal_spectrum -= numpy.sum(self.config['rf_atten_bandpasses'],axis=0)
         cal_spectrum -= self.config['pfb_scale_factor']
         cal_spectrum -= self.config['system_bandpass']
         if self.config['antenna_bandpass_calfile'] != 'none':
@@ -497,111 +495,6 @@ class spec:
              self.fpga.write_int('control', value)
              run_cnt = run_cnt +1
 
-    def _rf_atten_calc(self,gain=None,print_progress=False):
-        """Calculates the attenuations for each of the 3 RF attenuators in the RF box. \n
-        \t Valid range gain is -94.5 to 0dB; in this case we distribute the gain evenly across the 3 attenuators. \n
-        \t Alternatively, pass a tuple or list to specify the three values explicitly. \n
-        \t If no gain is specified, default to whatever's in the config file \n"""
-
-        #\t Specify 'auto' to attempt automatic gain calibration. \n
-        
-#        if len is 3, cont
-#        elif len is 1, calc 3 attens
-#        elif none, pull from config file
-#       round to 0.5dB, return.
-        
-
-        if type(gain)==list or type(gain)==numpy.ndarray or type(gain)==tuple:
-            rf_attens=gain
-        elif type(gain)==int  or type(gain)==float:
-            rf_attens=[gain/3. for att in range(3)]
-        elif gain==None:
-            self.logger.info('Using attenuator settings from config file.')
-            if self.config.has_key('rf_atten'):
-                rf_attens=[self.config['rf_atten']/3. for att in range(3)]
-            elif self.config.has_key('rf_attens'):   
-                self.logger.info('Using 3 user-supplied attenuator settings from config file.')
-            else:
-                raise RuntimeError('Unable to figure out your config file\'s frontend gains; please specify rf_atten (float) or rf_attens (list of 3 floats)!')
-        else:
-            raise RuntimeError('Unable to figure out your requested attenuation; please specify a single float or a list of 3 floats!')
-            
-        assert len(rf_attens)==3,'Incorect number of gains specified. Please input a list/tuple of 3 numbers'
-        for att in range(3):
-            assert (-31.5<=rf_attens[att]<=0),"Range for attenuator %i (%3.1f) is out of range (-31.5 to 0)."%(att,rf_attens[att])
-        return [round(att*2)/2 for att in rf_attens] 
-
-
-#        #start by grabbing the defaults from the config file; we'll override these in a minute if the user's asked for something else...
-#        #Try to figure out the frontend gain.
-#        self.config['rf_gain']=self.config['fe_amp']
-#        if self.config.has_key('rf_atten'):
-#            self.config['rf_attens']=[]
-#            for att in range(3):
-#                #TODO: add smarts here.
-#                self.config['rf_attens'].append(self.config['rf_atten']/3.)
-#
-#        if self.config.has_key('rf_attens'):
-#            for att in range(3):
-#                self.config['rf_attens'][att]=round(self.config['rf_attens'][att]*2)/2
-#                if self.config['rf_atten_gain_calfiles'][att] != 'none':
-#                    self.config['rf_gain']+=self.get_interpolated_attens(fileName=self.config['rf_atten_gain_calfiles'][att],setpoint=self.config['rf_attens'][att])
-#                else:
-#                    self.config['rf_gain']+=self.config['rf_attens'][att]
-#        else:
-#            raise RuntimeError('Unable to figure out your frontend gains; please specify rf_atten (float) or rf_attens (list of 3 floats)!')
-#
-#
-#        self.config['rf_gain']=self.config['fe_amp']
-#        set_gain=0
-#        if gain==None:
-#        #Try to figure out the desired frontend gain from the config file.
-#            if self.config.has_key('rf_atten'):
-#                self.config['rf_attens']=[]
-#                for att in range(3):
-#                    #TODO: add smarts here.
-#                    self.config['rf_attens'].append(self.config['rf_atten']/3.)
-#
-#        elif type(gain)==int  or type(gain)==float:
-#            for att in range(3):
-#                set_gain=-self._rf_atten_write(att,0-gain/3.)   
-#                self.config['rf_attens'][att]=set_gain
-#
-#        elif type(gain)==list or type(gain)==numpy.ndarray or type(a)==tuple:
-#            assert len(gain)==3,'Incorect number of gains specified. Please input a list/tuple of 3 numbers'
-#            self.config['rf_atten']=0
-#            for att in range(3):
-#                set_gain-=self._rf_atten_write(att,0-gain[att])   
-#                self.config['rf_attens'][att]=set_gain
-#                self.config['rf_atten']+=set_gain
-#                if self.config['rf_atten_gain_calfiles'][att] != 'none':
-#                    self.config['rf_gain']+=self.get_interpolated_attens(fileName=self.config['rf_atten_gain_calfiles'][att],setpoint=set_gain)
-#                else:
-#                    self.config['rf_gain']+=set_gain
-#
-#        elif (gain=='auto') or (gain == 'Auto') or (gain == 'AUTO'):
-#            self.auto_gain(print_progress=print_progress)
-#
-#        else:
-#            raise RuntimeError("Could not interpret your gain request. Input a float, a list of 3 values for each attenuator or 'auto'.")
-#
-#    def _rf_atten_write(self,attenuator,attenuation):
-#        """Writes to an RF attenuator. Valid attenuators are 0-2 with a range of 0 to 31.5db of attenuation. Attenuator 0 is closest to the antenna, attenuator 2 is closest to the ADC."""
-#        #    'atten0_le_pin' : 5,
-#        #    'atten1_le_pin' : 6,
-#        #    'atten2_le_pin' : 7,
-#        #    'atten_clk_pin' : 3,
-#        #    'atten_data_pin': 4}
-#        if attenuator == 0:
-#            set_att=self.rf_frontend.set_atten_db(le_pin=5,data_pin=4,clk_pin=3,atten_db=attenuation)
-#        elif attenuator == 1:
-#            set_att=self.rf_frontend.set_atten_db(le_pin=6,data_pin=4,clk_pin=3,atten_db=attenuation)
-#        elif attenuator == 2:
-#            set_att=self.rf_frontend.set_atten_db(le_pin=7,data_pin=4,clk_pin=3,atten_db=attenuation)
-#        else:
-#            raise RuntimeError("Invalid attenuator %i. Valid attenuators are %s."%(attenuation,range(0,4)))
-#        return set_att
-
     def adc_amplitudes_get(self):
         """Gets the ADC RMS amplitudes."""
         #TODO: CHECK THESE RETURNS!
@@ -611,7 +504,7 @@ class spec:
         rv['adc_rms_mv']=rv['adc_rms_raw']*self.config['adc_v_scale_factor']*1000
         rv['adc_dbm']=ratty2.cal.v_to_dbm(rv['adc_rms_mv']/1000.)
         #backout fe gain
-        rv['input_dbm']=rv['adc_dbm']-self.config['rf_gain']-numpy.sum(numpy.mean(self.config['rf_atten_bandpasses'],axis=1))
+        rv['input_dbm']=rv['adc_dbm']-self.config['fe_amp']-numpy.sum(numpy.mean(self.config['rf_atten_bandpasses'],axis=1))
         rv['input_rms_mv']=ratty2.cal.dbm_to_v(rv['input_dbm']*1000)
         return rv
 

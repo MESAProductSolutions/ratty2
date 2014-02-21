@@ -174,14 +174,17 @@ class cal:
 
         self.config['fft_scale']=bitcnt(self.config['fft_shift'])
 
-        #Try to figure out the desired frontend gain from the global config... rf_atten keyword overrides individual rf_attens specification.
+        self.update_atten_bandpass(gain=self._rf_atten_calc())
+
+        #Override any defaults:
+        for key in kwargs:
+            self.config[key]=kwargs[key]
+
+
+    def update_atten_bandpass(self,gain=None):
+        """Extract the RF bandpass calibration from the cal file and update global config."""
+        self.config['rf_attens']=[0,0,0]
         self.config['rf_atten_bandpasses']=[]
-        if (self.config.has_key('rf_atten')):
-            if (self.config['rf_atten'] != None):
-                self.config['rf_attens']=[]
-                for att in range(3):
-                    #TODO: add smarts here.
-                    self.config['rf_attens'].append(self.config['rf_atten']/3.)
         for atten in range(3):
             self.config['rf_attens'][atten] = round(self.config['rf_attens'][atten]*2)/2.
             if (self.config['rf_atten_gain_calfiles'][atten] != 'none'):
@@ -193,9 +196,42 @@ class cal:
                 self.config['rf_atten_bandpasses'].append(numpy.ones(self.config['n_chans'])*self.config['rf_attens'][atten])
                 #numpy.arange(self.config['rf_gain_range'][0],self.config['rf_gain_range'][1]+self.config['rf_gain_range'][2],self.config['rf_gain_range'][2])
 
-        #Override any defaults:
-        for key in kwargs:
-            self.config[key]=kwargs[key]
+
+    def _rf_atten_calc(self,gain=None):
+        """Calculates the attenuations for each of the 3 RF attenuators in the RF box. \n
+        \t Valid range gain is -94.5 to 0dB; in this case we distribute the gain evenly across the 3 attenuators. \n
+        \t Alternatively, pass a tuple or list to specify the three values explicitly. \n
+        \t If no gain is specified, default to whatever's in the config file \n"""
+
+        #\t Specify 'auto' to attempt automatic gain calibration. \n
+
+#        if len is 3, cont
+#        elif len is 1, calc 3 attens
+#        elif none, pull from config file
+#       round to 0.5dB, return.
+
+
+        if type(gain)==list or type(gain)==numpy.ndarray or type(gain)==tuple:
+            rf_attens=gain
+        elif type(gain)==int  or type(gain)==float:
+            rf_attens=[gain/3. for att in range(3)]
+        elif gain==None:
+            self.logger.info('Using attenuator settings from config file.')
+            if self.config.has_key('rf_atten'):
+                rf_attens=[self.config['rf_atten']/3. for att in range(3)]
+            elif self.config.has_key('rf_attens'):
+                self.logger.info('Using 3 user-supplied attenuator settings from config file.')
+            else:
+                raise RuntimeError('Unable to figure out your config file\'s frontend gains; please specify rf_atten (float) or rf_attens (list of 3 floats)!')
+        else:
+            raise RuntimeError('Unable to figure out your requested attenuation; please specify a single float or a list of 3 floats!')
+
+        assert len(rf_attens)==3,'Incorect number of gains specified. Please input a list/tuple of 3 numbers'
+        for att in range(3):
+            assert (-31.5<=rf_attens[att]<=0),"Range for attenuator %i (%3.1f) is out of range (-31.5 to 0)."%(att,rf_attens[att])
+        return [round(att*2)/2 for att in rf_attens]
+
+
 
     def plot_bandshape(self,freqs):
         import pylab
