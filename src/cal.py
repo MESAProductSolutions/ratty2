@@ -1,14 +1,18 @@
 # -*- coding: utf-8 -*-
 import numpy,scipy,scipy.interpolate,iniparse,ratty2
 
-#2013-04-24 rf_atten and fe_amp rolled into one.
+#2013-05-03 mods to support programmable attenuator spectral calibration.
+#2013-04-24 rf_atten and fe_amp rolled into one; arbitrary kwargs to _init now override config_file params.
 #smoothing functions from http://www.swharden.com/blog/2008-11-17-linear-data-smoothing-in-python/
 
 c=299792458. #speed of light in m/s
 #cal_file_path = "/etc/rfi_sys/cal_files/"; #For when you have everything working and ready to install with distutils
 cal_file_path = "/etc/ratty2/cal_files/"; #For development
 def cal_files(filename):
-    return "%s%s"%(cal_file_path, filename)
+    if filename[0]=='/' or filename[0]=='.': 
+        return filename
+    else:
+        return "%s%s"%(cal_file_path, filename)
 
 def smoothList(list,strippedXs=False,degree=10):  
      if strippedXs==True: return Xs[0:-(len(list)-(len(list)-degree+1))]  
@@ -139,8 +143,7 @@ def get_gains_from_csv(filename):
 class cal:
 
     def __init__(self, **kwargs):
-        """Either specify a config_file, or else specify
-            n_chans,bandwidth, n_par_streams, bitstream, fft_shfit, adc_type, desired_rf_level, spectrum_bits, antenna_bandpass, config['system_bandpass'], config['rf_gain'] and acc_period"""
+        """Either specificy a config_file or else specify individual kwargs."""
         self.config={}
         if kwargs.has_key('config_file'):
             self.config = ratty2.conf.rattyconf(**kwargs)
@@ -149,7 +152,14 @@ class cal:
             self.config[key]=kwargs[key]
         self.config['bandwidth']=self.config['sample_clk']/2
         self.config['chan_width']=numpy.float(self.config['bandwidth'])/self.config['n_chans']
-        self.calc_freqs()
+
+        self.config['nyquist_zone']=int(numpy.ceil((self.config['ignore_high_freq']+self.config['ignore_low_freq'])/2/(self.config['bandwidth'])))
+        if bool(self.config['nyquist_zone']&1): self.config['flip_spectrum']=False
+        else: self.config['flip_spectrum']=True
+
+        start_freq=(self.config['nyquist_zone']-1)*self.config['bandwidth']
+        stop_freq=(self.config['nyquist_zone'])*self.config['bandwidth']
+        self.config['freqs']=numpy.linspace(start_freq,stop_freq,self.config['n_chans'],endpoint=False)
 
         if (self.config['system_bandpass_calfile'] != 'none'):
             self.config['system_bandpass'] = self.get_interpolated_gains(self.config['system_bandpass_calfile'])
@@ -164,27 +174,28 @@ class cal:
 
         self.config['fft_scale']=bitcnt(self.config['fft_shift'])
 
-        #gain_setpoints=numpy.arange(self.config['rf_gain_range'][0],self.config['rf_gain_range'][1]+self.config['rf_gain_range'][2],self.config['rf_gain_range'][2])
+        #Try to figure out the desired frontend gain from the global config... rf_atten keyword overrides individual rf_attens specification.
+        self.config['rf_atten_bandpasses']=[]
+        if (self.config.has_key('rf_atten')):
+            if (self.config['rf_atten'] != None):
+                self.config['rf_attens']=[]
+                for att in range(3):
+                    #TODO: add smarts here.
+                    self.config['rf_attens'].append(self.config['rf_atten']/3.)
+        for atten in range(3):
+            self.config['rf_attens'][atten] = round(self.config['rf_attens'][atten]*2)/2.
+            if (self.config['rf_atten_gain_calfiles'][atten] != 'none'):
+                self.config['rf_atten_bandpasses'].append(self.get_interpolated_attens(
+                    filename=self.config['rf_atten_gain_calfiles'][atten],
+                    atten_db=self.config['rf_attens'][atten],
+                    freqs_hz=self.config['freqs']))
+            else:
+                self.config['rf_atten_bandpasses'].append(numpy.ones(self.config['n_chans'])*self.config['rf_attens'][atten])
+                #numpy.arange(self.config['rf_gain_range'][0],self.config['rf_gain_range'][1]+self.config['rf_gain_range'][2],self.config['rf_gain_range'][2])
 
         #Override any defaults:
         for key in kwargs:
             self.config[key]=kwargs[key]
-
-    def calc_freqs(self):
-        "Calculate and store in config the centre frequency that each spectral channel represents. Order is always lowest freq to highest freq."
-#TODO: make this work for other nyquist zones!
-        #self.config['freqs']=numpy.arange(self.config['n_chans'])*float(self.config['bandwidth'])/self.config['n_chans'] #channel center freqs   in Hz
-        #figure out which Nyquist zone we're in:
-        band_centre=(self.config['ignore_low_freq'] + self.config['ignore_low_freq'])/2.0
-        self.config['nyquist_zone']=int(numpy.floor(band_centre/self.config['bandwidth']))+1 #industry standard to number baseband as zone 1, not zero.
-        freqs=numpy.arange(self.config['n_chans'])*float(self.config['bandwidth'])/self.config['n_chans'] + (self.config['nyquist_zone']-1)*self.config['bandwidth'] #channel center freqs   in Hz
-        if (self.config['nyquist_zone'] & 0x01):
-            self.config['flip_spectrum']=False
-        else:
-            self.config['flip_spectrum']=True
-        self.config['freqs']=freqs
-        #print 'Nyquist zone is %i, with frequencies:'%self.config['nyquist_zone'] 
-        #print freqs
 
     def plot_bandshape(self,freqs):
         import pylab
@@ -202,16 +213,37 @@ class cal:
         pylab.xlabel('Requested value (dB)')
         pylab.ylabel('Actual value (dB)')
     
-    def get_interpolated_gains(self,fileName):
+    def get_interpolated_gains(self,filename):
         """Retrieves antenna gain mapping from bandpass csv files and interpolates data to return values at 'freqs'."""
-        cal_freqs,cal_gains=get_gains_from_csv(cal_files(fileName))
+        cal_freqs,cal_gains=get_gains_from_csv(cal_files(filename))
         inter_freqs=scipy.interpolate.interp1d(cal_freqs,cal_gains,kind='linear')
         return inter_freqs(self.config['freqs'])
 
-    def get_interpolated_attens(self,fileName,setpoint):
-        cal_setpoints,cal_attens=get_gains_from_csv(cal_files(fileName))
-        inter_attens=scipy.interpolate.interp1d(cal_setpoints,cal_attens,kind='linear')
-        return inter_attens(setpoint)
+    def get_interpolated_attens(self,filename,atten_db,freqs_hz):
+        atten=[]
+        freqs=[]
+        gains=[]
+        more=True
+        fp=open(cal_files(filename),'r')
+        import csv
+        fc=csv.DictReader(fp,delimiter=',')
+        while(more):
+            try: 
+                raw_line=fc.next()
+            except:
+                more=False
+                break
+            #print raw_line
+            for pair in raw_line['freq_hz:measured_gain_db'].split(';'):
+                freq,gain = pair.split(':')
+                atten.append(numpy.float(raw_line['setpoint_db']))
+                freqs.append(float(freq))
+                gains.append(float(gain))
+                #print 'Got a point on the curve: atten %f, freq %f, gain %f'%(atten[-1],freqs[-1],gains[-1])
+        #gain_setpoints=numpy.arange(self.config['rf_gain_range'][0],self.config['rf_gain_range'][1]+self.config['rf_gain_range'][2],self.config['rf_gain_range'][2])
+        inter_attens=scipy.interpolate.interp2d(atten,freqs,gains,kind='linear')
+        #print 'evaluating at atten settings:',atten_db
+        return inter_attens(atten_db,freqs_hz).reshape(len(freqs_hz))
 
     def plot_ant_gain(self):
         """Plots the antenna gain."""
@@ -231,55 +263,30 @@ class cal:
 
     def freq_to_chan(self,frequency,n_chans=None):
         """Returns the channel number where a given frequency is to be found. Frequency is in Hz."""
-#        if frequency<0: 
-#            frequency=self.config['bandwidth']+frequency
-#            #print 'you want',frequency
-        #print self.config['freqs']
-        if frequency>self.config['freqs'][-1]: raise RuntimeError("Requested frequency (%fHz) is too high. Max for your configuration is %fHz."%(frequency,self.config['freqs'][-1]))
-        if frequency<self.config['freqs'][0]: raise RuntimeError("that frequency (%fHz) is too low. Min for your configuration is %fHz."%(frequency,self.             config['freqs'][0]))
-        if n_chans==None:
-            n_chans=self.config['n_chans']
-        return round(float(frequency)/self.config['bandwidth']*n_chans)%n_chans
+        #if frequency<0: 
+        #    frequency=self.config['bandwidth']+frequency
+        return round(float(frequency)/self.config['bandwidth']*self.config['n_chans'])%self.config['n_chans']
 
     def get_input_adc_v_scale_factor(self):
         """Provide the calibration factor to get from an ADC input voltage to the actual frontend input voltage. Does not perform any frequency-dependent calibration."""
-        return 1/(10**((self.config['rf_gain'])/20.))
+        return 1/(10**((self.config['rf_gain']+numpy.sum(numpy.mean(self.config['rf_atten_bandpasses'],axis=1)))/20.))
 
     def calibrate_adc_snapshot(self,raw_data):
         """Calibrates a raw ADC count timedomain snapshot. Returns ADC samples in V, ADC spectrum in dBm, input spectrum in dBm and input spectrum of n_chans in dBm."""
         ret={}
-        ret['adc_raw']=raw_data
-        ret['adc_v']=raw_data*self.config['adc_v_scale_factor']
+        ret['adc_mixed']=numpy.array(raw_data)
+        if self.config['flip_spectrum']:
+            ret['adc_mixed'][::2]*=-1
+        ret['adc_v']=ret['adc_mixed']*self.config['adc_v_scale_factor']
         ret['input_v']=ret['adc_v']*self.get_input_adc_v_scale_factor() 
-        #Calculate the spectrum:
         n_accs=len(raw_data)/self.config['n_chans']/2
         window=numpy.hamming(self.config['n_chans']*2)
         spectrum=numpy.zeros(self.config['n_chans'])
-        #freqs=numpy.arange(self.config['n_chans'])*float(self.config['bandwidth'])/self.config['n_chans'] 
-        #user now specifies global options on command line (can override any variable), so can use global config; no need to deal with custom chans/freqs.
-        ret['freqs']=self.config['freqs']
+        ret['n_accs']=n_accs
         for acc in range(n_accs):
             spectrum += numpy.abs((numpy.fft.rfft(ret['adc_v'][self.config['n_chans']*2*acc:self.config['n_chans']*2*(acc+1)]*window)[0:self.config['n_chans']])) 
         ret['adc_spectrum_dbm']  = 20*numpy.log10(spectrum/n_accs/self.config['n_chans']*6.14)
-
-        # no need to recalc these here every time; use global config.
-        #if self.config['system_bandpass_calfile'] != 'none':
-        #cal_freqs,cal_gains=get_gains_from_csv(cal_files(self.config['system_bandpass_calfile']))
-        #inter_freqs=scipy.interpolate.interp1d(cal_freqs,cal_gains,kind='linear')
-        #bp=inter_freqs(freqs)
-        #ret['system_bandpass']=bp
-        ret['system_bandpass']=self.config['system_bandpass']
-        #else: bp=0
-        ret['input_spectrum_dbm']=ret['adc_spectrum_dbm']-bp-self.config['rf_gain']
-
+        ret['input_spectrum_dbm']=ret['adc_spectrum_dbm']-self.config['system_bandpass']-self.config['rf_gain']-numpy.sum(self.config['rf_atten_bandpasses'],axis=0)
         if self.config['antenna_bandpass_calfile'] != 'none':
-            #get antenna factor:
-            # no need to recalc these here every time; use global config.
-            #cal_freqs,cal_gains=get_gains_from_csv(cal_files(self.config['antenna_bandpass_calfile']))
-            #inter_freqs=scipy.interpolate.interp1d(cal_freqs,cal_gains,kind='linear')
-            #af=af_from_gain(freqs,inter_freqs(freqs))
-            af=self.config['ant_factor']
-            ret['ant_factor']=af
-            ret['antenna_bandpass']=inter_freqs(freqs)
-            ret['input_spectrum_dbuv'] = dbm_to_dbuv(ret['input_spectrum_dbm']) + af 
+            ret['input_spectrum_dbuv'] = dbm_to_dbuv(ret['input_spectrum_dbm']) + self.config['antenna_factor']
         return ret

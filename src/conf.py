@@ -1,6 +1,6 @@
 import iniparse, exceptions, socket, struct, numpy, os,scipy
 """
-Library for parsing RATTY configuration files
+Library for parsing CASPER correlator configuration files
 
 Author: Jason Manley
 """
@@ -17,7 +17,6 @@ cal_file_path = "/etc/ratty2/cal_files/"; #For development
 class rattyconf:    
     def __init__(self, **kwargs):
         self.config_file = kwargs['config_file']
-        #self.config_file_name = os.path.split(self.config_file)[1]
         self.cp = iniparse.INIConfig(open(self.config_file, 'rb'))
         self.config = kwargs
         self.read_common()
@@ -84,9 +83,9 @@ class rattyconf:
         self.config['adc_low_level_warning']=-35
         self.config['adc_high_level_warning']=0
         self.config['fpga_clk']=self.config['sample_clk']/8
-        self.config['adc_levels_acc_len']=65536        
+        self.config['adc_levels_acc_len']=4500000./512.
         self.config['adc_type']='mkadc 1800Msps, 10b, single input'
-        self.config['pfb_scale_factor']=101.0 #a scaling co-efficient corresponding to the gain through the digital filterbank
+        self.config['pfb_scale_factor']=99.0 #a scaling co-efficient corresponding to the gain through the digital filterbank
 
         self.config['katcp_port']=7147
         self.config['roach_ip']=struct.unpack('>I',socket.inet_aton(self.get_line('connection','roach_ip')))[0]
@@ -94,11 +93,10 @@ class rattyconf:
        
         self.config['rf_gain_range']=[-31.5,0,0.5] 
         self.read_int('analogue_frontend','band_sel')
-        self.read_float('analogue_frontend','desired_rf_level')
+#        self.read_float('analogue_frontend','desired_rf_level')
         self.read_float('analogue_frontend','fe_amp')
         self.read_float('analogue_frontend','ignore_high_freq')
         self.read_float('analogue_frontend','ignore_low_freq')
-#        self.read_bool('analogue_frontend','flip_spectrum')
         self.config['antenna_bandpass_calfile']=self.get_line('analogue_frontend','antenna_bandpass_calfile')
         self.config['system_bandpass_calfile']=self.get_line('analogue_frontend','system_bandpass_calfile')
         self.config['rf_atten_gain_calfiles']=[cf for cf in (self.get_line('analogue_frontend','rf_atten_gain_calfiles')).split(LISTDELIMIT)]

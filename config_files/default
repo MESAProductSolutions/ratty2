@@ -2,10 +2,12 @@
 bitstream = r2_spec_mk_32k_rf_2013_Dec_12_1657.bof.gz 
 #r2_spec_mk_32k_rf_2013_Nov_20_1103.bof.gz
 #fft shift bitmask. Set to 'auto' to try'n automatically determine this.
-fft_shift = 32736
+#use this for CW-like signals (highest DR):
+fft_shift = 65535
+#use this for noise-like signals (greatest sensitivity):
+#fft_shift = 32736 
 #Each ADC count represents how many volts? 250mV/512=0.00048828125
 adc_v_scale_factor=0.00048828125
-
 #How long do you want to accumulate in seconds?
 acc_period=1 
 sample_clk=1800e6
@@ -20,18 +22,15 @@ band_sel=1
 ignore_low_freq=1e6
 ignore_high_freq=899e6
 system_bandpass_calfile=flat_bandpass.csv
-#antenna_bandpass_calfile=flat_bandpass.csv
 antenna_bandpass_calfile=none
 
 #set RF attenuators to desired level in dB.  Valid range is -94.5 to 0.
-rf_atten=-10
+rf_atten=-90
 #Alternatively, specify the three manually! The first one corresponds to antenna side, the last one is ADC side.
+#rf_attens=-20,-20,-20
 
-rf_atten_gain_calfiles=none,none,none
-
-#When auto-attenuating, what is the target RF level in dBm:
-desired_rf_level = 0
+rf_atten_gain_calfiles=flat_atten.csv,none,none
 
 #How much gain does your frontend RF chain have, in dB?
-fe_amp=0
+fe_amp=90
 

@@ -326,6 +326,8 @@ class spec:
             print '\tSelecting RF band %i (%i-%i MHz) and adjusting attenuators...'%(self.config['band_sel'],self.config['ignore_low_freq']/1.e6,self.config['ignore_high_freq']/1.e6),
         self.fe_set()
         if print_progress: print 'ok: %3.1fdb total (%2.1fdb, %2.1fdB, %2.1fdB)'%(self.config['rf_atten'],self.config['rf_attens'][0],self.config['rf_attens'][1],self.config['rf_attens'][2])
+
+        if print_progress: print '\tTotal frontend gain: %3.1fdb'%(self.config['rf_gain'])
     
         if print_progress:
             print '\tConfiguring FFT shift schedule...',
@@ -609,7 +611,7 @@ class spec:
         rv['adc_rms_mv']=rv['adc_rms_raw']*self.config['adc_v_scale_factor']*1000
         rv['adc_dbm']=ratty2.cal.v_to_dbm(rv['adc_rms_mv']/1000.)
         #backout fe gain
-        rv['input_dbm']=rv['adc_dbm']-self.config['rf_gain']
+        rv['input_dbm']=rv['adc_dbm']-self.config['rf_gain']-numpy.sum(numpy.mean(self.config['rf_atten_bandpasses'],axis=1))
         rv['input_rms_mv']=ratty2.cal.dbm_to_v(rv['input_dbm']*1000)
         return rv
 
