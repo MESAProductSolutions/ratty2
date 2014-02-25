@@ -21,7 +21,7 @@ class spec:
 
         if not kwargs.has_key('config_file'): kwargs['config_file']='/etc/ratty2/default'
 
-        self.cal=ratty2.cal.cal(**kwargs)
+        self.cal=ratty2.cal.cal(logger=self.logger,**kwargs)
         self.config=self.cal.config
 
         self.last_acc_cnt=1 #skip the first accumulation (0), which contains junk.
@@ -267,7 +267,7 @@ class spec:
         #    self.config['rf_atten']+=atten
         #        self.config['rf_gain']+=atten
         #print '0x%08X\n'%bitmap
-        self.cal.update_atten_bandpass(gain=self.cal._rf_atten_calc(gain))
+        self.cal.update_atten_bandpass(gains=self.cal._rf_atten_calc(gain))
         for (att,atten) in enumerate(self.config['rf_attens']):
             bitmap+=(~(int(-atten*2)))<<(8+(6*int(att))) #6 bits each, following on from above rf_band_select.
             self.logger.info("Setting attenuator %i to %3.1f"%(att,atten))
@@ -294,12 +294,12 @@ class spec:
     def initialise(self,skip_program=False, clk_check=False, input_sel='Q',print_progress=False):
         """Initialises the system to defaults."""
         if print_progress:
-            print '\tProgramming FPGA...',
+            print '\tProgramming FPGA with %s...'%(self.config['bitstream']),
             sys.stdout.flush()
         if not skip_program:
             self.fpga.upload_program_bof('/etc/ratty2/boffiles/'+self.config['bitstream'],3333)
             #time.sleep(3)
-            self.fpga.progdev(self.config['bitstream'])
+            #self.fpga.progdev(self.config['bitstream'])
             if print_progress: print 'ok'
         elif print_progress: print 'skipped'
         

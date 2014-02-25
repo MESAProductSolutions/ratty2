@@ -142,11 +142,20 @@ def get_gains_from_csv(filename):
 
 class cal:
 
-    def __init__(self, **kwargs):
+    def __init__(self, logger=None,**kwargs):
         """Either specificy a config_file or else specify individual kwargs."""
         self.config={}
         if kwargs.has_key('config_file'):
             self.config = ratty2.conf.rattyconf(**kwargs)
+
+        if logger == None: 
+            self.logger=corr.log_handlers.DebugLogHandler(100)
+            self.lh = log_handler
+            self.logger = logging.getLogger('RATTY2 Cal')
+            self.logger.setLevel(log_level)
+            self.logger.addHandler(self.lh)
+        else:
+            self.logger=logger
 
         for key in kwargs:
             self.config[key]=kwargs[key]
@@ -174,16 +183,16 @@ class cal:
 
         self.config['fft_scale']=bitcnt(self.config['fft_shift'])
 
-        self.update_atten_bandpass(gain=self._rf_atten_calc())
+        self.update_atten_bandpass(gains=self._rf_atten_calc())
 
         #Override any defaults:
         for key in kwargs:
             self.config[key]=kwargs[key]
 
 
-    def update_atten_bandpass(self,gain=None):
+    def update_atten_bandpass(self,gains):
         """Extract the RF bandpass calibration from the cal file and update global config."""
-        self.config['rf_attens']=[0,0,0]
+        self.config['rf_attens']=[gains[0],gains[1],gains[2]]
         self.config['rf_atten_bandpasses']=[]
         for atten in range(3):
             self.config['rf_attens'][atten] = round(self.config['rf_attens'][atten]*2)/2.
@@ -305,7 +314,7 @@ class cal:
 
     def get_input_adc_v_scale_factor(self):
         """Provide the calibration factor to get from an ADC input voltage to the actual frontend input voltage. Does not perform any frequency-dependent calibration."""
-        return 1/(10**((self.config['rf_gain']+numpy.sum(numpy.mean(self.config['rf_atten_bandpasses'],axis=1)))/20.))
+        return 1/(10**((self.config['fe_amp']+numpy.sum(numpy.mean(self.config['rf_atten_bandpasses'],axis=1)))/20.))
 
     def calibrate_adc_snapshot(self,raw_data):
         """Calibrates a raw ADC count timedomain snapshot. Returns ADC samples in V, ADC spectrum in dBm, input spectrum in dBm and input spectrum of n_chans in dBm."""
@@ -322,7 +331,7 @@ class cal:
         for acc in range(n_accs):
             spectrum += numpy.abs((numpy.fft.rfft(ret['adc_v'][self.config['n_chans']*2*acc:self.config['n_chans']*2*(acc+1)]*window)[0:self.config['n_chans']])) 
         ret['adc_spectrum_dbm']  = 20*numpy.log10(spectrum/n_accs/self.config['n_chans']*6.14)
-        ret['input_spectrum_dbm']=ret['adc_spectrum_dbm']-self.config['system_bandpass']-self.config['rf_gain']-numpy.sum(self.config['rf_atten_bandpasses'],axis=0)
+        ret['input_spectrum_dbm']=ret['adc_spectrum_dbm']-self.config['system_bandpass']-self.config['fe_amp']-numpy.sum(self.config['rf_atten_bandpasses'],axis=0)
         if self.config['antenna_bandpass_calfile'] != 'none':
             ret['input_spectrum_dbuv'] = dbm_to_dbuv(ret['input_spectrum_dbm']) + self.config['antenna_factor']
         return ret
