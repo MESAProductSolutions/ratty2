@@ -293,24 +293,23 @@ class spec:
         
     def initialise(self,skip_program=False, clk_check=False, input_sel='Q',print_progress=False):
         """Initialises the system to defaults."""
-        if print_progress:
-            print '\tProgramming FPGA with %s...'%(self.config['bitstream']),
-            sys.stdout.flush()
         if not skip_program:
+            if print_progress: 
+                print '\tConfiguring Valon frequency to %5.1f MHz sample clock...'%(self.config['sample_clk']/1e6),
+                sys.stdout.flush()
+            self.set_valon()
+            if print_progress: print 'ok'   
+
+            if print_progress:
+                print '\tProgramming FPGA with %s...'%(self.config['bitstream']),
+                sys.stdout.flush()
             self.fpga.upload_program_bof('/etc/ratty2/boffiles/'+self.config['bitstream'],3333)
-            #time.sleep(3)
+            time.sleep(5)
             #self.fpga.progdev(self.config['bitstream'])
             if print_progress: print 'ok'
-        elif print_progress: print 'skipped'
+            
+        elif print_progress: print 'Reprogramming skipped.'
         
-        """Set the Valon synthesizer frequency to sample clock."""
-        if print_progress: 
-            print '\tConfiguring Valon frequency to %5.1f MHz sample clock...'%(self.config['sample_clk']/1e6),
-            sys.stdout.flush()
-            
-        self.set_valon()
-        if print_progress: print 'ok'   
-            
         if clk_check: 
             if print_progress:
                 print '\tChecking clocks...',
@@ -326,7 +325,7 @@ class spec:
         if print_progress: print '\tTotal frontend gain: %3.1fdb'%(self.config['fe_amp']+numpy.sum(numpy.mean(self.config['rf_atten_bandpasses'],axis=1)))
     
         if print_progress:
-            print '\tConfiguring FFT shift schedule...',
+            print '\tConfiguring FFT shift schedule to %i...'%self.config['fft_shift'],
             sys.stdout.flush()
         self.fft_shift_set()
         if print_progress: print 'ok'
@@ -338,7 +337,7 @@ class spec:
         if print_progress: print 'ok'
 
         if print_progress:
-            print '\tClearing status...',
+            print '\tClearing status and aligning PFB...',
             sys.stdout.flush()
         self.ctrl_set(mrst='pulse',cnt_rst='pulse',clr_status='pulse',flasher_en=False)
         if print_progress: print 'ok'

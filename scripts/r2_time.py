@@ -281,7 +281,7 @@ try:
         print 'done.'
 
         r.initialise(skip_program=(not opts.fpga_prog), print_progress=True)
-        r.rf_frontend.stop() #disconnect from the RF interface, in case other instances want to take control while we're running.
+        #r.rf_frontend.stop() #disconnect from the RF interface, in case other instances want to take control while we're running.
 
         co.config['trig_scale_factor']=co.get_input_adc_v_scale_factor()*co.config['adc_v_scale_factor']
         co.config['trig_level']=int((opts.trig_level/1000.)/co.config['trig_scale_factor'])
