@@ -85,7 +85,7 @@ class rattyconf:
         self.config['fpga_clk']=self.config['sample_clk']/8
         self.config['adc_levels_acc_len']=4500000./512.
         self.config['adc_type']='mkadc 1800Msps, 10b, single input'
-        self.config['pfb_scale_factor']=99.0 #a scaling co-efficient corresponding to the gain through the digital filterbank
+        self.config['pfb_scale_factor']=88.0 #a scaling co-efficient corresponding to the gain through the digital filterbank
 
         self.config['katcp_port']=7147
         self.config['roach_ip']=struct.unpack('>I',socket.inet_aton(self.get_line('connection','roach_ip')))[0]

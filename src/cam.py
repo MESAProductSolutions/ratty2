@@ -268,7 +268,8 @@ class spec:
         #        self.config['rf_gain']+=atten
         #print '0x%08X\n'%bitmap
         self.cal.update_atten_bandpass(gains=self.cal._rf_atten_calc(gain))
-        for (att,atten) in enumerate(self.config['rf_attens']):
+
+        for (att,atten) in enumerate(self.config['rf_attens']):	    
             bitmap+=(~(int(-atten*2)))<<(8+(6*int(att))) #6 bits each, following on from above rf_band_select.
             self.logger.info("Setting attenuator %i to %3.1f"%(att,atten))
         self.fpga.write_int('rf_ctrl0',bitmap)
@@ -289,6 +290,8 @@ class spec:
         time.sleep(3)
         valon.set_frequency(valon_synth.SYNTH_B,freq/1.e6)
         time.sleep(3)
+	valon.set_ref_select(1)
+	time.sleep(3)
         s.close()
         
     def initialise(self,skip_program=False, clk_check=False, input_sel='Q',print_progress=False):
