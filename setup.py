@@ -1,7 +1,7 @@
 from distutils.core import setup, Extension
 import os, sys, glob
 
-__version__ = '0.0.3'
+__version__ = '0.0.4'
 
 setup(name = 'ratty2',
     version = __version__,

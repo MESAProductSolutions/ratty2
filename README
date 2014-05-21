@@ -5,6 +5,8 @@ install is standard:
 
   * Antenna and other system calibration files should be comma separated values with at least two columns, headed 'freq_hz' and 'gain_dbi' with the appropriate values. Do not include any other header information.
 
+Rev 0.0.4   RF_ATTEN now a single number (can't pass three individual attenuator values). Misc fixes to calibration.
+Rev 0.0.3   merged sys_bandpass with rf_atten_bandpass.
 Rev 0.0.2   Initial rework of package; cleanup and simplification. Untested. YMMV. 2013-04-26
 Rev 0.0.1   Clone from ratty1  commit 8d57ac4a45 on 2012-09-05
 

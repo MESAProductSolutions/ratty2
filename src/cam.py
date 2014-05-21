@@ -255,10 +255,12 @@ class spec:
         \t 0: 0-828 MHz \n
         \t 1: 750-1100 MHz \n
         \t 2: 900-1670 MHz \n
-        \t 3: passthrough \n
+        \t 3: 1950-2450 MHz \n
         Valid gain range is -94.5 to 0dB; in this case we distribute the gain evenly across the 3 attenuators. \n
         Alternatively, pass a tuple or list to specify the three values explicitly. \n
         If no gain is specified, default to whatever's in the config file \n"""
+	if gain==None:
+            gain=self.config['rf_atten']
         rf_band,bitmap=self._rf_band_switch_calc(rf_band=rf_band) #8bits
         self.config['band_sel']=rf_band
         self.logger.info("Selected RF band %i."%rf_band)
@@ -267,9 +269,10 @@ class spec:
         #    self.config['rf_atten']+=atten
         #        self.config['rf_gain']+=atten
         #print '0x%08X\n'%bitmap
-        self.cal.update_atten_bandpass(gains=self.cal._rf_atten_calc(gain))
+        self.cal.update_atten_bandpass(gain=gain)
+	attens=self.cal._rf_atten_calc(gain)
 
-        for (att,atten) in enumerate(self.config['rf_attens']):	    
+        for (att,atten) in enumerate(attens):
             bitmap+=(~(int(-atten*2)))<<(8+(6*int(att))) #6 bits each, following on from above rf_band_select.
             self.logger.info("Setting attenuator %i to %3.1f"%(att,atten))
         self.fpga.write_int('rf_ctrl0',bitmap)
@@ -286,12 +289,10 @@ class spec:
         valon = valon_synth.Synthesizer(s)                
         if freq==None:
             freq=self.config['sample_clk']
-        valon.set_frequency(valon_synth.SYNTH_A,freq/1.e6)
-        time.sleep(3)
         valon.set_frequency(valon_synth.SYNTH_B,freq/1.e6)
         time.sleep(3)
-	valon.set_ref_select(1)
-	time.sleep(3)
+	valon.set_ref_select(0)
+	#time.sleep(3)
         s.close()
         
     def initialise(self,skip_program=False, clk_check=False, input_sel='Q',print_progress=False):
@@ -321,11 +322,11 @@ class spec:
             if print_progress: print 'ok, %i MHz'%est_rate
         
         if print_progress:
-            print '\tSelecting RF band %i (%i-%i MHz) and adjusting attenuators...'%(self.config['band_sel'],self.config['ignore_low_freq']/1.e6,self.config['ignore_high_freq']/1.e6),
+            print '\tSelecting RF band %i (%i-%i MHz) and adjusting attenuators for %4.1fdB total attenuation...'%(self.config['band_sel'],self.config['ignore_low_freq']/1.e6,self.config['ignore_high_freq']/1.e6,self.config['rf_atten']),
         self.fe_set()
-        if print_progress: print 'ok: %3.1fdb total (%2.1fdb, %2.1fdB, %2.1fdB)'%(self.config['rf_atten'],self.config['rf_attens'][0],self.config['rf_attens'][1],self.config['rf_attens'][2])
+        if print_progress: print 'ok'
 
-        if print_progress: print '\tTotal frontend gain: %3.1fdb'%(self.config['fe_amp']+numpy.sum(numpy.mean(self.config['rf_atten_bandpasses'],axis=1)))
+        if print_progress: print '\tTotal frontend gain: %3.1fdb'%((numpy.mean(self.config['system_bandpass'])))
     
         if print_progress:
             print '\tConfiguring FFT shift schedule to %i...'%self.config['fft_shift'],
@@ -393,34 +394,42 @@ class spec:
         for i in range(self.config['n_par_streams']):
             spectrum[i::self.config['n_par_streams']] = numpy.fromstring(self.fpga.read('%s%i'%(self.config['spectrum_bram_out_prefix'],i),self.config['n_chans']/self.config['n_par_streams']*8),dtype=numpy.uint64).byteswap()
         self.last_acc_cnt = self.fpga.read_uint('acc_cnt')
-        if self.config['flip_spectrum']: spectrum=spectrum[::-1] 
-        stat = self.status_get()
+        if self.config['flip_spectrum']: spectrum=spectrum[::-1]
+	stat = self.status_get()
         ampls = self.adc_amplitudes_get()
         if stat['adc_shutdown']: self.logger.error('ADC selfprotect due to overrange!')
         elif stat['adc_overrange']: self.logger.warning('ADC is clipping!')
         elif stat['fft_overrange']: self.logger.error('FFT is overflowing!')
         #print '[%i] %s: input level: %5.2f dBm (ADC %5.2f dBm).'%(last_acc_cnt,time.ctime(timestamp),stat['input_level'],stat['adc_level']),
         #print '\t\tMean raw: %i'%numpy.mean(spectrum)
-
-        cal_spectrum = spectrum
+	
+        cal_spectrum = spectrum		
         cal_spectrum /= float(self.config['n_accs'])
         cal_spectrum *= self.config['fft_scale']
         cal_spectrum *= self.config['adc_v_scale_factor']
+
         #cal_spectrum /= self.config['chan_width']
         #print '\t\tMean adc_v scale: %f'%numpy.mean(cal_spectrum)
         cal_spectrum  = 10*numpy.log10(cal_spectrum)
         #print '\t\tMean log: %f'%numpy.mean(cal_spectrum)
+
         #TODO Fix this to use attenuator bandpass calibrations:
-        cal_spectrum -= self.config['fe_amp']
-        cal_spectrum -= numpy.sum(self.config['rf_atten_bandpasses'],axis=0)
+        #cal_spectrum -= self.config['fe_amp']
+        #cal_spectrum -= numpy.sum(self.config['rf_atten_bandpasses'],axis=0)
+
+	#AJO
+	cal_spectrum -= self.config['system_bandpass']
+
+	#print 'gain_function ', self.config['rf_atten_bandpasses']
+
         cal_spectrum -= self.config['pfb_scale_factor']
-        cal_spectrum -= self.config['system_bandpass']
+        #cal_spectrum -= self.config['system_bandpass']
+	
         if self.config['antenna_bandpass_calfile'] != 'none':
             cal_spectrum = ratty2.cal.dbm_to_dbuv(cal_spectrum)
             cal_spectrum += self.config['ant_factor']
         #print '\t\tMean ant_bp: %f'%numpy.mean(cal_spectrum)
-    
-
+    	
         return {'raw_spectrum':spectrum, 
                 'calibrated_spectrum':cal_spectrum,
                 'timestamp':time.time(),
@@ -506,7 +515,8 @@ class spec:
         rv['adc_rms_mv']=rv['adc_rms_raw']*self.config['adc_v_scale_factor']*1000
         rv['adc_dbm']=ratty2.cal.v_to_dbm(rv['adc_rms_mv']/1000.)
         #backout fe gain
-        rv['input_dbm']=rv['adc_dbm']-self.config['fe_amp']-numpy.sum(numpy.mean(self.config['rf_atten_bandpasses'],axis=1))
+        rv['input_dbm']=rv['adc_dbm']-(numpy.mean(self.config['system_bandpass']))
+	#rv['input_dbm']=rv['adc_dbm']-numpy.sum(numpy.mean(self.config['rf_atten_bandpasses'],axis=1))
         rv['input_rms_mv']=ratty2.cal.dbm_to_v(rv['input_dbm']*1000)
         return rv
 

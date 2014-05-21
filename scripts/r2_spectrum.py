@@ -115,6 +115,7 @@ def find_n_max(data,n_max,ignore_adjacents=False):
 def drawDataCallback(cnt):
     stat = getUnpackedData(cnt)
     calData=stat['calibrated_spectrum']
+    
     cnt=stat['file_cnt']
 
     subplot1.cla()

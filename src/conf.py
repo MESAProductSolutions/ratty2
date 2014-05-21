@@ -85,33 +85,31 @@ class rattyconf:
         self.config['fpga_clk']=self.config['sample_clk']/8
         self.config['adc_levels_acc_len']=4500000./512.
         self.config['adc_type']='mkadc 1800Msps, 10b, single input'
-        self.config['pfb_scale_factor']=88.0 #a scaling co-efficient corresponding to the gain through the digital filterbank
+        self.config['pfb_scale_factor']=148.2 #(148.2) a scaling co-efficient corresponding to the gain through the digital filterbank
 
         self.config['katcp_port']=7147
         self.config['roach_ip']=struct.unpack('>I',socket.inet_aton(self.get_line('connection','roach_ip')))[0]
         self.config['roach_ip_str']=self.get_line('connection','roach_ip')
        
-        self.config['rf_gain_range']=[-31.5,0,0.5] 
+	#current parallel attenuation settings allow for 1 dB steps
+        #self.config['rf_gain_range']=[-31.5,0,0.5] 
+	self.config['rf_gain_range']=[-31.0,0,1.0]
         self.read_int('analogue_frontend','band_sel')
 #        self.read_float('analogue_frontend','desired_rf_level')
-        self.read_float('analogue_frontend','fe_amp')
         self.read_float('analogue_frontend','ignore_high_freq')
         self.read_float('analogue_frontend','ignore_low_freq')
         self.config['antenna_bandpass_calfile']=self.get_line('analogue_frontend','antenna_bandpass_calfile')
         self.config['system_bandpass_calfile']=self.get_line('analogue_frontend','system_bandpass_calfile')
-        self.config['rf_atten_gain_calfiles']=[cf for cf in (self.get_line('analogue_frontend','rf_atten_gain_calfiles')).split(LISTDELIMIT)]
+        #self.config['rf_atten_gain_calfiles']=[cf for cf in (self.get_line('analogue_frontend','rf_atten_gain_calfiles')).split(LISTDELIMIT)]
 
 #        if self.get_line('analogue_frontend','rf_gain').strip() == 'auto':
 #            self.config['rf_gain'] = None
 #        else:  
-        try:
-            self.config['rf_attens'] = [float(att) for att in (self.get_line('analogue_frontend','rf_attens')).split(LISTDELIMIT)]
-        except:
-            pass 
-        try:
-            self.read_float('analogue_frontend','rf_atten')
-        except:
-            pass
+        #try:
+        #    self.config['rf_attens'] = [float(att) for att in (self.get_line('analogue_frontend','rf_attens')).split(LISTDELIMIT)]
+        #except:
+        #    pass 
+        self.read_float('analogue_frontend','rf_atten')
 
 
     def write(self,section,variable,value):

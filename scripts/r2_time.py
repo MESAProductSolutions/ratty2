@@ -224,12 +224,22 @@ def csv_writer(dat,quiescent):
     fcp.close()
 
 def parseargs(args):
+    #ret={}
+    #for arg in args:
+    #    arg=arg.split('=')
+    #    try:
+    #        ret[arg[0]]=ast.literal_eval(arg[1])
+    #    except ValueError:
+    #        ret[arg[0]]=arg[1]
+    #return ret
     ret={}
     for arg in args:
         arg=arg.split('=')
         try:
             ret[arg[0]]=ast.literal_eval(arg[1])
         except ValueError:
+            ret[arg[0]]=arg[1]
+        except SyntaxError:
             ret[arg[0]]=arg[1]
     return ret
 
@@ -260,6 +270,7 @@ if __name__ == '__main__':
     p.set_description(__doc__)
     opts, args = p.parse_args(sys.argv[1:])
     kwargs=parseargs(args)
+
     verbose=opts.verbose
     play_filename=opts.play_file
     wait_keypress=opts.wait_keypress
@@ -283,7 +294,7 @@ try:
         r.initialise(skip_program=(not opts.fpga_prog), print_progress=True)
         #r.rf_frontend.stop() #disconnect from the RF interface, in case other instances want to take control while we're running.
 
-        co.config['trig_scale_factor']=co.get_input_adc_v_scale_factor()*co.config['adc_v_scale_factor']
+        co.config['trig_scale_factor']=co.get_input_scale_factor()*co.config['adc_v_scale_factor']
         co.config['trig_level']=int((opts.trig_level/1000.)/co.config['trig_scale_factor'])
         co.config['n_samples']=int(opts.capture_len/1.e9*co.config['sample_clk'])
 
@@ -296,7 +307,10 @@ try:
         print 'done'
 
         usrlog=('Starting file at %s (%i).'%(time.ctime(),int(time.time())))
-        #f['/'].attrs['usrlog']=usrlog
+
+	#f['/']... was commented out
+        f['/'].attrs['usrlog']=usrlog
+
         co.config['usrlog']=('Starting file at %i.'%(int(time.time()))).join(args)
         f.create_dataset('adc_raw',shape=[1,len(baseline)],dtype=numpy.int16,maxshape=[None,len(baseline)])
         for key in r.config.config.keys():
@@ -320,7 +334,7 @@ try:
                 print 'trying',key
                 if len(f[key])>1: conf_ovr[key]=f[key][:]
                 else: conf_ovr[key]=f[key]
-        conf_ovr['atten_gain_map']=dict(conf_ovr['atten_gain_map'])
+        #conf_ovr['atten_gain_map']=dict(conf_ovr['atten_gain_map'])
         co=ratty2.cal.cal(**conf_ovr)
 
     freqs=co.config['freqs']

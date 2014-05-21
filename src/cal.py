@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-import numpy,scipy,scipy.interpolate,iniparse,ratty2
+import numpy,scipy,scipy.interpolate,iniparse,ratty2,corr
 
 #2013-05-03 mods to support programmable attenuator spectral calibration.
 #2013-04-24 rf_atten and fe_amp rolled into one; arbitrary kwargs to _init now override config_file params.
@@ -148,14 +148,14 @@ class cal:
         if kwargs.has_key('config_file'):
             self.config = ratty2.conf.rattyconf(**kwargs)
 
-        if logger == None: 
-            self.logger=corr.log_handlers.DebugLogHandler(100)
-            self.lh = log_handler
-            self.logger = logging.getLogger('RATTY2 Cal')
-            self.logger.setLevel(log_level)
-            self.logger.addHandler(self.lh)
-        else:
-            self.logger=logger
+        #if logger == None: 
+            #self.logger=corr.log_handlers.DebugLogHandler(100)
+            #self.lh = log_handler
+            #self.logger = logging.getLogger('RATTY2 Cal')
+            #self.logger.setLevel(log_level)
+            #self.logger.addHandler(self.lh)
+        #else:
+           # self.logger=logger
 
         for key in kwargs:
             self.config[key]=kwargs[key]
@@ -170,11 +170,6 @@ class cal:
         stop_freq=(self.config['nyquist_zone'])*self.config['bandwidth']
         self.config['freqs']=numpy.linspace(start_freq,stop_freq,self.config['n_chans'],endpoint=False)
 
-        if (self.config['system_bandpass_calfile'] != 'none'):
-            self.config['system_bandpass'] = self.get_interpolated_gains(self.config['system_bandpass_calfile'])
-        else:
-            self.config['system_bandpass'] = numpy.zeros(self.config['n_chans'])
-
         if (self.config['antenna_bandpass_calfile'] != 'none'):
             self.config['antenna_bandpass'] = self.get_interpolated_gains(self.config['antenna_bandpass_calfile'])
         else:
@@ -183,27 +178,28 @@ class cal:
 
         self.config['fft_scale']=bitcnt(self.config['fft_shift'])
 
-        self.update_atten_bandpass(gains=self._rf_atten_calc())
+        self.update_atten_bandpass(gain=self.config['rf_atten'])
 
         #Override any defaults:
         for key in kwargs:
             self.config[key]=kwargs[key]
 
 
-    def update_atten_bandpass(self,gains):
-        """Extract the RF bandpass calibration from the cal file and update global config."""
-        self.config['rf_attens']=[gains[0],gains[1],gains[2]]
-        self.config['rf_atten_bandpasses']=[]
-        for atten in range(3):
-            self.config['rf_attens'][atten] = round(self.config['rf_attens'][atten]*2)/2.
-            if (self.config['rf_atten_gain_calfiles'][atten] != 'none'):
-                self.config['rf_atten_bandpasses'].append(self.get_interpolated_attens(
-                    filename=self.config['rf_atten_gain_calfiles'][atten],
-                    atten_db=self.config['rf_attens'][atten],
-                    freqs_hz=self.config['freqs']))
-            else:
-                self.config['rf_atten_bandpasses'].append(numpy.ones(self.config['n_chans'])*self.config['rf_attens'][atten])
-                #numpy.arange(self.config['rf_gain_range'][0],self.config['rf_gain_range'][1]+self.config['rf_gain_range'][2],self.config['rf_gain_range'][2])
+    def update_atten_bandpass(self,gain):
+        """Extract the RF bandpass calibration from the cal file and update global config for the user-specified gain setting."""
+	
+        #self.config['rf_attens']=[gains[0],gains[1],gains[2]]0	
+	self.config['rf_atten']=gain
+        self.config['sys_bandpass']=[]
+        if (self.config['system_bandpass_calfile'] != 'none'):
+            self.config['system_bandpass']=self.get_interpolated_attens(
+                filename=self.config['system_bandpass_calfile'],
+	        #PARALLEL ATTENUATORS
+	        atten_db=self.config['rf_atten'],
+                freqs_hz=self.config['freqs'])
+        else:
+            self.config['system_bandpass'] = numpy.ones(self.config['n_chans'])*self.config['rf_atten']
+            #numpy.arange(self.config['rf_gain_range'][0],self.config['rf_gain_range'][1]+self.config['rf_gain_range'][2],self.config['rf_gain_range'][2])
 
 
     def _rf_atten_calc(self,gain=None):
@@ -225,11 +221,12 @@ class cal:
         elif type(gain)==int  or type(gain)==float:
             rf_attens=[gain/3. for att in range(3)]
         elif gain==None:
-            self.logger.info('Using attenuator settings from config file.')
+            #self.logger.info('Using attenuator settings from config file.')
             if self.config.has_key('rf_atten'):
                 rf_attens=[self.config['rf_atten']/3. for att in range(3)]
             elif self.config.has_key('rf_attens'):
-                self.logger.info('Using 3 user-supplied attenuator settings from config file.')
+		rf_attens=self.config['rf_attens']
+                #self.logger.info('Using 3 user-supplied attenuator settings from config file.')
             else:
                 raise RuntimeError('Unable to figure out your config file\'s frontend gains; please specify rf_atten (float) or rf_attens (list of 3 floats)!')
         else:
@@ -237,9 +234,9 @@ class cal:
 
         assert len(rf_attens)==3,'Incorect number of gains specified. Please input a list/tuple of 3 numbers'
         for att in range(3):
-            assert (-31.5<=rf_attens[att]<=0),"Range for attenuator %i (%3.1f) is out of range (-31.5 to 0)."%(att,rf_attens[att])
+            assert (-31.0<=rf_attens[att]<=0),"Range for attenuator %i (%3.1f) is out of range (-31.0 to 0)."%(att,rf_attens[att])
+	#PARALLEL ATTENUATORS ONLY STEP IN 1dB STEPS - NEED TO ROUND 1dB
         return [round(att*2)/2 for att in rf_attens]
-
 
 
     def plot_bandshape(self,freqs):
@@ -288,6 +285,7 @@ class cal:
         #gain_setpoints=numpy.arange(self.config['rf_gain_range'][0],self.config['rf_gain_range'][1]+self.config['rf_gain_range'][2],self.config['rf_gain_range'][2])
         inter_attens=scipy.interpolate.interp2d(atten,freqs,gains,kind='linear')
         #print 'evaluating at atten settings:',atten_db
+        #print 'evaluating at freqs:',freqs_hz
         return inter_attens(atten_db,freqs_hz).reshape(len(freqs_hz))
 
     def plot_ant_gain(self):
@@ -312,9 +310,11 @@ class cal:
         #    frequency=self.config['bandwidth']+frequency
         return round(float(frequency)/self.config['bandwidth']*self.config['n_chans'])%self.config['n_chans']
 
-    def get_input_adc_v_scale_factor(self):
+    def get_input_scale_factor(self):
         """Provide the calibration factor to get from an ADC input voltage to the actual frontend input voltage. Does not perform any frequency-dependent calibration."""
-        return 1/(10**((self.config['fe_amp']+numpy.sum(numpy.mean(self.config['rf_atten_bandpasses'],axis=1)))/20.))
+        #return 1/(10**((self.config['fe_amp']+numpy.sum(numpy.mean(self.config['rf_atten_bandpasses'],axis=1)))/20.))
+	#return 1/(10**((numpy.sum(numpy.mean(self.config['rf_atten_bandpasses'],axis=1)))/20.))
+	return 1/(10**((numpy.mean(self.config['system_bandpass']))/20.))
 
     def calibrate_adc_snapshot(self,raw_data):
         """Calibrates a raw ADC count timedomain snapshot. Returns ADC samples in V, ADC spectrum in dBm, input spectrum in dBm and input spectrum of n_chans in dBm."""
@@ -323,7 +323,7 @@ class cal:
         if self.config['flip_spectrum']:
             ret['adc_mixed'][::2]*=-1
         ret['adc_v']=ret['adc_mixed']*self.config['adc_v_scale_factor']
-        ret['input_v']=ret['adc_v']*self.get_input_adc_v_scale_factor() 
+        ret['input_v']=ret['adc_v']*self.get_input_scale_factor() 
         n_accs=len(raw_data)/self.config['n_chans']/2
         window=numpy.hamming(self.config['n_chans']*2)
         spectrum=numpy.zeros(self.config['n_chans'])
@@ -331,7 +331,8 @@ class cal:
         for acc in range(n_accs):
             spectrum += numpy.abs((numpy.fft.rfft(ret['adc_v'][self.config['n_chans']*2*acc:self.config['n_chans']*2*(acc+1)]*window)[0:self.config['n_chans']])) 
         ret['adc_spectrum_dbm']  = 20*numpy.log10(spectrum/n_accs/self.config['n_chans']*6.14)
-        ret['input_spectrum_dbm']=ret['adc_spectrum_dbm']-self.config['system_bandpass']-self.config['fe_amp']-numpy.sum(self.config['rf_atten_bandpasses'],axis=0)
+        #ret['input_spectrum_dbm']=ret['adc_spectrum_dbm']-self.config['system_bandpass']-self.config['fe_amp']-numpy.sum(self.config['rf_atten_bandpasses'],axis=0)
+	ret['input_spectrum_dbm']=ret['adc_spectrum_dbm']-(self.config['system_bandpass'])
         if self.config['antenna_bandpass_calfile'] != 'none':
             ret['input_spectrum_dbuv'] = dbm_to_dbuv(ret['input_spectrum_dbm']) + self.config['antenna_factor']
         return ret
