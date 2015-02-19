@@ -13,7 +13,7 @@ class spec:
     def __init__(self, connect=False, log_handler=None, log_level=logging.INFO, **kwargs):
 
         if log_handler == None: log_handler=corr.log_handlers.DebugLogHandler(100)
-            
+
         self.lh = log_handler
         self.logger = logging.getLogger('RATTY2')
         self.logger.setLevel(log_level)
@@ -89,11 +89,11 @@ class spec:
             self.rf_gain_set(rf_gain)
             time.sleep(0.1)
             n_tries += 1
-        if n_tries >= max_n_tries: 
+        if n_tries >= max_n_tries:
             log_str='Auto RF gain adjust failed.'
             self.logger.error(log_str)
             if print_progress: print log_str
-        else: 
+        else:
             log_str='Auto RF gain adjust success.'
             if print_progress: print log_str
             self.logger.info(log_str)
@@ -104,7 +104,7 @@ class spec:
         stat=self.status_get()
         orig_fft_shift = self.config['fft_shift']
         fft_shift_adj = self.config['fft_shift']
-        while not(stat['fft_overrange']): 
+        while not(stat['fft_overrange']):
             fft_shift_adj = fft_shift_adj << 1
             self.fft_shift_set(fft_shift_adj)
             self.ctrl_set(mrst='pulse',cnt_rst='pulse',clr_status='pulse',flasher_en=False)
@@ -166,9 +166,9 @@ class spec:
     #    """
         # RF lineup:
         # 1. RF.IN -- Amp1 --  RF.SW1.4 -- 0-828MHz filterchain -- RF.SW2.3 -- var.att1 -- Amp2 -- var.att2 -- Amp3 -- var.att3 -- Amp4 -- RF.OUT
-        # 2.               --  RF.SW1.2 -- N/C                  -- RF.SW2.5 -- 
-        # 3.               --  RF.SW1.5 -- 900MHz-1.67GHz chain -- RF.SW2.2 -- 
-        # 4.               --  RF.SW1.3 -- N/C                  -- RF.SW2.4 -- 
+        # 2.               --  RF.SW1.2 -- N/C                  -- RF.SW2.5 --
+        # 3.               --  RF.SW1.5 -- 900MHz-1.67GHz chain -- RF.SW2.2 --
+        # 4.               --  RF.SW1.3 -- N/C                  -- RF.SW2.4 --
 
         #    'switch1_C5' (select port1-port2) : 12,
         #    'switch1_C3' (select port1-port3) : 13,
@@ -235,7 +235,7 @@ class spec:
         #                                       bitOLD: bitNEW:
         #    'switch1_C5' (select port1-port2) : 31,    0
         #    'switch1_C3' (select port1-port3) : 30,    1
-        #    'switch1_C4' (select port1-port4) : 29,    2   
+        #    'switch1_C4' (select port1-port4) : 29,    2
         #    'switch1_C6' (select port1-port5) : 28,    3
 
         #    'switch2_C5' (select port1-port2) : 27,    4
@@ -277,16 +277,16 @@ class spec:
             self.logger.info("Setting attenuator %i to %3.1f"%(att,atten))
         self.fpga.write_int('rf_ctrl0',bitmap)
 
-    def set_valon(self,freq=None):        
+    def set_valon(self,freq=None):
         "Configures Valon synth attached to ROACH2 ser2net gateway on port 7148."
-        PORT = 7148             # The same port as used by the server 
+        PORT = 7148             # The same port as used by the server
         socket._socketobject.read = socket._socketobject.recv
         socket._socketobject.write = socket._socketobject.send
         s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         s.settimeout(2)
         s.connect((self.config['roach_ip_str'], PORT))
-        
-        valon = valon_synth.Synthesizer(s)                
+
+        valon = valon_synth.Synthesizer(s)
         if freq==None:
             freq=self.config['sample_clk']
         valon.set_frequency(valon_synth.SYNTH_B,freq/1.e6)
@@ -294,15 +294,15 @@ class spec:
 	valon.set_ref_select(0)
 	#time.sleep(3)
         s.close()
-        
+
     def initialise(self,skip_program=False, clk_check=False, input_sel='Q',print_progress=False):
         """Initialises the system to defaults."""
         if not skip_program:
-            if print_progress: 
+            if print_progress:
                 print '\tConfiguring Valon frequency to %5.1f MHz sample clock...'%(self.config['sample_clk']/1e6),
                 sys.stdout.flush()
             self.set_valon()
-            if print_progress: print 'ok'   
+            if print_progress: print 'ok'
 
             if print_progress:
                 print '\tProgramming FPGA with %s...'%(self.config['bitstream']),
@@ -311,23 +311,23 @@ class spec:
             time.sleep(5)
             #self.fpga.progdev(self.config['bitstream'])
             if print_progress: print 'ok'
-            
+
         elif print_progress: print 'Reprogramming skipped.'
-        
-        if clk_check: 
+
+        if clk_check:
             if print_progress:
                 print '\tChecking clocks...',
                 sys.stdout.flush()
             est_rate=self.clk_check()
             if print_progress: print 'ok, %i MHz'%est_rate
-        
+
         if print_progress:
             print '\tSelecting RF band %i (%i-%i MHz) and adjusting attenuators for %4.1fdB total attenuation...'%(self.config['band_sel'],self.config['ignore_low_freq']/1.e6,self.config['ignore_high_freq']/1.e6,self.config['rf_atten']),
         self.fe_set()
         if print_progress: print 'ok'
 
         if print_progress: print '\tTotal frontend gain: %3.1fdb'%((numpy.mean(self.config['system_bandpass'])))
-    
+
         if print_progress:
             print '\tConfiguring FFT shift schedule to %i...'%self.config['fft_shift'],
             sys.stdout.flush()
@@ -347,15 +347,15 @@ class spec:
         if print_progress: print 'ok'
 
         stat=self.status_get()
-        if stat['adc_shutdown']: 
+        if stat['adc_shutdown']:
             log_msg='ADC selfprotect due to overrange!'
             self.logger.error(log_msg)
             if print_progress: print log_msg
-        elif stat['adc_overrange']: 
+        elif stat['adc_overrange']:
             log_msg='ADC is clipping!'
             self.logger.warn(log_msg)
             if print_progress: print log_msg
-        elif stat['fft_overrange']: 
+        elif stat['fft_overrange']:
             log_msg='FFT is overflowing!'
             self.logger.error(log_msg)
             if print_progress: print log_msg
@@ -390,20 +390,20 @@ class spec:
         while self.fpga.read_uint('acc_cnt') <= (last_acc_cnt):  #Wait until the next accumulation has been performed. Polling; too bad!
             time.sleep(0.1)
             #print "cnt = " + str(self.fpga.read_uint('acc_cnt'))
-        spectrum = numpy.zeros(self.config['n_chans']) 
+        spectrum = numpy.zeros(self.config['n_chans'])
         for i in range(self.config['n_par_streams']):
             spectrum[i::self.config['n_par_streams']] = numpy.fromstring(self.fpga.read('%s%i'%(self.config['spectrum_bram_out_prefix'],i),self.config['n_chans']/self.config['n_par_streams']*8),dtype=numpy.uint64).byteswap()
         self.last_acc_cnt = self.fpga.read_uint('acc_cnt')
         if self.config['flip_spectrum']: spectrum=spectrum[::-1]
-	stat = self.status_get()
+        stat = self.status_get()
         ampls = self.adc_amplitudes_get()
         if stat['adc_shutdown']: self.logger.error('ADC selfprotect due to overrange!')
         elif stat['adc_overrange']: self.logger.warning('ADC is clipping!')
         elif stat['fft_overrange']: self.logger.error('FFT is overflowing!')
         #print '[%i] %s: input level: %5.2f dBm (ADC %5.2f dBm).'%(last_acc_cnt,time.ctime(timestamp),stat['input_level'],stat['adc_level']),
         #print '\t\tMean raw: %i'%numpy.mean(spectrum)
-	
-        cal_spectrum = spectrum		
+
+        cal_spectrum = spectrum
         cal_spectrum /= float(self.config['n_accs'])
         cal_spectrum *= self.config['fft_scale']
         cal_spectrum *= self.config['adc_v_scale_factor']
@@ -417,37 +417,37 @@ class spec:
         #cal_spectrum -= self.config['fe_amp']
         #cal_spectrum -= numpy.sum(self.config['rf_atten_bandpasses'],axis=0)
 
-	#AJO
-	cal_spectrum -= self.config['system_bandpass']
+        #AJO
+        cal_spectrum -= self.config['system_bandpass']
 
-	#print 'gain_function ', self.config['rf_atten_bandpasses']
+        #print 'gain_function ', self.config['rf_atten_bandpasses']
 
         cal_spectrum -= self.config['pfb_scale_factor']
         #cal_spectrum -= self.config['system_bandpass']
-	
+
         if self.config['antenna_bandpass_calfile'] != 'none':
             cal_spectrum = ratty2.cal.dbm_to_dbuv(cal_spectrum)
             cal_spectrum += self.config['ant_factor']
         #print '\t\tMean ant_bp: %f'%numpy.mean(cal_spectrum)
-    	
-        return {'raw_spectrum':spectrum, 
+
+        return {'raw_spectrum':spectrum,
                 'calibrated_spectrum':cal_spectrum,
                 'timestamp':time.time(),
                 'acc_cnt':self.last_acc_cnt,
-                'adc_overrange':stat['adc_overrange'], 
-                'fft_overrange': stat['fft_overrange'], 
-                'adc_shutdown':stat['adc_shutdown'], 
-                'adc_level':ampls['adc_dbm'], 
-                'input_level':ampls['input_dbm'], 
-                'adc_temp':self.adc_temp_get(), 
-                'ambient_temp': self.ambient_temp_get()} 
+                'adc_overrange':stat['adc_overrange'],
+                'fft_overrange': stat['fft_overrange'],
+                'adc_shutdown':stat['adc_shutdown'],
+                'adc_level':ampls['adc_dbm'],
+                'input_level':ampls['input_dbm'],
+                'adc_temp':self.adc_temp_get(),
+                'ambient_temp': self.ambient_temp_get()}
 
     def fft_shift_set(self,fft_shift_schedule=None):
-        """Sets the FFT shift schedule (divide-by-two) on each FFT stage. 
+        """Sets the FFT shift schedule (divide-by-two) on each FFT stage.
             Input is an integer representing a binary bitmask for shifting.
             If not specified as a parameter to this function, set the default level from the config file."""
         if fft_shift_schedule==None: fft_shift_schedule=self.config['fft_shift']
-        self.fpga.write_int('fft_shift',fft_shift_schedule) 
+        self.fpga.write_int('fft_shift',fft_shift_schedule)
         self.config['fft_shift']=fft_shift_schedule
         self.config['fft_scale']=2**(cal.bitcnt(fft_shift_schedule))
         self.logger.info("Set FFT shift to %8x (scaling down by %i)."%(fft_shift_schedule,self.config['fft_scale']))
@@ -456,7 +456,7 @@ class spec:
         """Fetches the current FFT shifting schedule from the hardware."""
         self.config['fft_shift']=self.fpga.read_uint('fft_shift')
         self.config['fft_scale']=2**(cal.bitcnt(self.config['fft_shift']))
-        return self.config['fft_shift'] 
+        return self.config['fft_shift']
 
     def ctrl_get(self):
         """Reads and decodes the values from the control register."""
@@ -472,7 +472,7 @@ class spec:
     def ctrl_set(self,**kwargs):
          """Sets bits of all the Fengine control registers. Keeps any previous state.
              \nPossible boolean kwargs:
-             \n\t adc_protect_disable 
+             \n\t adc_protect_disable
              \n\t flasher_en
              \n\t clr_status
              \n\t mrst
@@ -548,7 +548,7 @@ class spec:
         return self.acc_time,self.config['n_accs']
 
     def get_adc_snapshot(self,trig_level=-1):
-        if trig_level>0: 
+        if trig_level>0:
             self.fpga.write_int('trig_level',trig_level)
             circ_capture=True
         else:
@@ -572,15 +572,15 @@ def ByteToHex( byteStr ):
     """
     Convert a byte string to it's hex string representation e.g. for output.
     """
-    
+
     # Uses list comprehension which is a fractionally faster implementation than
     # the alternative, more readable, implementation below
-    #   
+    #
     #    hex = []
     #    for aChar in byteStr:
     #        hex.append( "%02X " % ord( aChar ) )
     #
-    #    return ''.join( hex ).strip()        
+    #    return ''.join( hex ).strip()
 
     return ''.join( [ "%02X " % ord( x ) for x in byteStr ] ).strip()
 
