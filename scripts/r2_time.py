@@ -61,7 +61,7 @@ def drawDataCallback(n_samples,trig_level):
     max_lev =numpy.max(abs_levs)
     trigs = numpy.ma.flatnotmasked_edges(numpy.ma.masked_less_equal(abs_levs,(trig_level-4)*trig_scale_factor))
     #print trigs
-    if (trigs == None or trigs[0] ==0) and trig_level>0 and (max_lev/trig_scale_factor)<trig_level: 
+    if (trigs == None or trigs[0] ==0) and trig_level>0 and (max_lev/trig_scale_factor)<trig_level:
         #r.logger.error('Error triggering. Found no trigger points.')
         max_pos = numpy.argmax(calData)
         #r.logger.error('ERROR: we asked for a trigger level of %4.2fmV and the hardware reported success, but the maximum level in the returned data was only %4.2fmV.'%(trig_level*trig_scale_factor,max_lev))
@@ -71,7 +71,7 @@ def drawDataCallback(n_samples,trig_level):
         max_pos = numpy.argmax(calData)
     else:
         max_pos = trigs[0]
-    
+
     next_subplot=0
     if opts.plot_hist:
         subplots[0].cla()
@@ -115,7 +115,7 @@ def drawDataCallback(n_samples,trig_level):
     else:
         calSpectrum=dat['input_spectrum_dbuv']
         emptySpectrum=co.calibrate_adc_snapshot(raw_data=dat['adc_raw'][t_start:max_pos-1])['input_spectrum_dbuv']
-        
+
     #print 'got a spectrum:',calSpectrum
     #print 'plotting from %i to %i'%(t_start,max_pos-1)
     pylab.hold(True)
@@ -128,7 +128,7 @@ def drawDataCallback(n_samples,trig_level):
     subplots[next_subplot].set_xlabel('Frequency (MHz)')
 
     if opts.csv_file:
-        csv_writer(dat,quiescent=emptySpectrum) 
+        csv_writer(dat,quiescent=emptySpectrum)
 
     fig.canvas.draw()
     if wait_keypress:
@@ -142,7 +142,7 @@ def getUnpackedData():
     global cnt
     if play_filename==None:
         print '\nFetching data from ROACH...',
-        unpackedBytes = r.get_adc_snapshot(trig_level=co.config['trig_level']) 
+        unpackedBytes = r.get_adc_snapshot(trig_level=co.config['trig_level'])
         print 'done'
         stat=r.status_get()
         ampls=r.adc_amplitudes_get()
@@ -248,15 +248,15 @@ if __name__ == '__main__':
     from optparse import OptionParser
     p = OptionParser()
     p.set_usage('%prog [options] LOG_MESSAGE')
-    p.add_option('-v', '--verbose', dest = 'verbose', action = 'store_true',default=False, 
+    p.add_option('-v', '--verbose', dest = 'verbose', action = 'store_true',default=False,
         help = 'Enable debug mode.')
-    p.add_option('-o', '--plot_hist', dest = 'plot_hist', action = 'store_false',default=True, 
+    p.add_option('-o', '--plot_hist', dest = 'plot_hist', action = 'store_false',default=True,
         help = 'Do not plot the histogram.')
-    p.add_option('-t', '--capture_len', dest = 'capture_len', type='int', default = 100, 
+    p.add_option('-t', '--capture_len', dest = 'capture_len', type='int', default = 100,
         help = 'Plot this many nano-seconds around the trigger point. Default:100')
-    p.add_option('-n', '--n_chans', dest = 'n_chans', type='int', default = 512, 
+    p.add_option('-n', '--n_chans', dest = 'n_chans', type='int', default = 512,
         help = 'Number of frequency channels to resolve in software FFT. Default:512')
-    p.add_option('-l', '--trig_level', dest = 'trig_level', type='float', default = 0., 
+    p.add_option('-l', '--trig_level', dest = 'trig_level', type='float', default = 0.,
         help = 'Ask the hardware to wait for a signal with at least this amplitude in mV before capturing. Default: 0 (disabled, just plot current input).')
     p.add_option('-f', '--play_file', dest = 'play_file', type='string', default=None,
         help = 'Open an existing file for analysis.')
@@ -308,7 +308,7 @@ try:
 
         usrlog=('Starting file at %s (%i).'%(time.ctime(),int(time.time())))
 
-	#f['/']... was commented out
+	    #f['/']... was commented out
         f['/'].attrs['usrlog']=usrlog
 
         co.config['usrlog']=('Starting file at %i.'%(int(time.time()))).join(args)
@@ -322,7 +322,7 @@ try:
                     f[key]=r.config[key]
                 except TypeError:
                     if r.config[key]==None: f['/'].attrs[key]='none'
-                    elif type(r.config[key])==dict: 
+                    elif type(r.config[key])==dict:
                         f[key]=r.config[key].items()
 
     else:

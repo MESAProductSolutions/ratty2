@@ -9,66 +9,66 @@ c=299792458. #speed of light in m/s
 #cal_file_path = "/etc/rfi_sys/cal_files/"; #For when you have everything working and ready to install with distutils
 cal_file_path = "/etc/ratty2/cal_files/"; #For development
 def cal_files(filename):
-    if filename[0]=='/' or filename[0]=='.': 
+    if filename[0]=='/' or filename[0]=='.':
         return filename
     else:
         return "%s%s"%(cal_file_path, filename)
 
-def smoothList(list,strippedXs=False,degree=10):  
-     if strippedXs==True: return Xs[0:-(len(list)-(len(list)-degree+1))]  
-     smoothed=[0]*(len(list)-degree+1)  
-     for i in range(len(smoothed)):  
-         smoothed[i]=sum(list[i:i+degree])/float(degree)  
-     return smoothed  
+def smoothList(list,strippedXs=False,degree=10):
+     if strippedXs==True: return Xs[0:-(len(list)-(len(list)-degree+1))]
+     smoothed=[0]*(len(list)-degree+1)
+     for i in range(len(smoothed)):
+         smoothed[i]=sum(list[i:i+degree])/float(degree)
+     return smoothed
 
-def smoothListTriangle(list,strippedXs=False,degree=5):  
-     weight=[]  
-     window=degree*2-1  
-     smoothed=[0.0]*(len(list)-window)  
-     for x in range(1,2*degree):weight.append(degree-abs(degree-x))  
-     w=numpy.array(weight)  
-     for i in range(len(smoothed)):  
-         smoothed[i]=sum(numpy.array(list[i:i+window])*w)/float(sum(w))  
-     return smoothed  
+def smoothListTriangle(list,strippedXs=False,degree=5):
+     weight=[]
+     window=degree*2-1
+     smoothed=[0.0]*(len(list)-window)
+     for x in range(1,2*degree):weight.append(degree-abs(degree-x))
+     w=numpy.array(weight)
+     for i in range(len(smoothed)):
+         smoothed[i]=sum(numpy.array(list[i:i+window])*w)/float(sum(w))
+     return smoothed
 
-def smoothListGaussian(list,strippedXs=False,degree=5):  
-     window=degree*2-1  
-     weight=numpy.array([1.0]*window)  
-     weightGauss=[]  
-     for i in range(window):  
-         i=i-degree+1  
-         frac=i/float(window)  
-         gauss=1/(numpy.exp((4*(frac))**2))  
-         weightGauss.append(gauss)  
-     weight=numpy.array(weightGauss)*weight  
-     smoothed=[0.0]*(len(list)-window)  
-     for i in range(len(smoothed)):  
-         smoothed[i]=sum(numpy.array(list[i:i+window])*weight)/sum(weight)  
-     return smoothed  
+def smoothListGaussian(list,strippedXs=False,degree=5):
+     window=degree*2-1
+     weight=numpy.array([1.0]*window)
+     weightGauss=[]
+     for i in range(window):
+         i=i-degree+1
+         frac=i/float(window)
+         gauss=1/(numpy.exp((4*(frac))**2))
+         weightGauss.append(gauss)
+     weight=numpy.array(weightGauss)*weight
+     smoothed=[0.0]*(len(list)-window)
+     for i in range(len(smoothed)):
+         smoothed[i]=sum(numpy.array(list[i:i+window])*weight)/sum(weight)
+     return smoothed
 
 def calc_mkadc_bandpass(chans,adc_cal_file_i):
     gain_mkAdc = getDictFromCSV(adc_cal_file_i)#('/home/henno/adc_bandpass_20-890MHz_n10dBm_input_sn004.csv')
     x = numpy.arange(0,len(gain_mkAdc),1)
-    y = numpy.zeros(len(gain_mkAdc))    
+    y = numpy.zeros(len(gain_mkAdc))
     for i in range(len(gain_mkAdc)-1):
-        y[i] = gain_mkAdc[(i)*10.0] 
+        y[i] = gain_mkAdc[(i)*10.0]
     x_int = numpy.arange(0,len(gain_mkAdc),len(gain_mkAdc)/(chans*1.0))
     bandFlat = numpy.subtract(10,numpy.interp(x_int, x, y))
     return bandFlat
 
 def dmw_per_sq_m_to_dbuv(dbmw):
-    # from http://www.ahsystems.com/notes/RFconversions.php: dBmW/m2 = dBmV/m - 115.8 
+    # from http://www.ahsystems.com/notes/RFconversions.php: dBmW/m2 = dBmV/m - 115.8
     return dbmw + 115.8
 
 def dbuv_to_dmw_per_sq_m(dbuv):
-    # from http://www.ahsystems.com/notes/RFconversions.php: dBmW/m2 = dBmV/m - 115.8 
+    # from http://www.ahsystems.com/notes/RFconversions.php: dBmW/m2 = dBmV/m - 115.8
     return dbuv - 115.8
 
 def dbm_to_dbuv(dbm):
     return dbm+106.98
 
 def dbuv_to_dbm(dbuv):
-    return dbm-106.98 
+    return dbm-106.98
 
 def v_to_dbuv(v):
     return 20*numpy.log10(v*1e6)
@@ -131,7 +131,7 @@ def get_gains_from_csv(filename):
     import csv
     fc=csv.DictReader(fp)
     while(more):
-        try: 
+        try:
             raw_line=fc.next()
             freqs.append(numpy.float(raw_line['freq_hz']))
             gains.append(numpy.float(raw_line['gain_db']))
@@ -148,7 +148,7 @@ class cal:
         if kwargs.has_key('config_file'):
             self.config = ratty2.conf.rattyconf(**kwargs)
 
-        #if logger == None: 
+        #if logger == None:
             #self.logger=corr.log_handlers.DebugLogHandler(100)
             #self.lh = log_handler
             #self.logger = logging.getLogger('RATTY2 Cal')
@@ -187,8 +187,8 @@ class cal:
 
     def update_atten_bandpass(self,gain):
         """Extract the RF bandpass calibration from the cal file and update global config for the user-specified gain setting."""
-	
-        #self.config['rf_attens']=[gains[0],gains[1],gains[2]]0	
+
+        #self.config['rf_attens']=[gains[0],gains[1],gains[2]]0
 	self.config['rf_atten']=gain
         self.config['sys_bandpass']=[]
         if (self.config['system_bandpass_calfile'] != 'none'):
@@ -254,7 +254,7 @@ class cal:
         pylab.title('RF attenuator mapping')
         pylab.xlabel('Requested value (dB)')
         pylab.ylabel('Actual value (dB)')
-    
+
     def get_interpolated_gains(self,filename):
         """Retrieves antenna gain mapping from bandpass csv files and interpolates data to return values at 'freqs'."""
         cal_freqs,cal_gains=get_gains_from_csv(cal_files(filename))
@@ -270,7 +270,7 @@ class cal:
         import csv
         fc=csv.DictReader(fp,delimiter=',')
         while(more):
-            try: 
+            try:
                 raw_line=fc.next()
             except:
                 more=False
@@ -306,7 +306,7 @@ class cal:
 
     def freq_to_chan(self,frequency,n_chans=None):
         """Returns the channel number where a given frequency is to be found. Frequency is in Hz."""
-        #if frequency<0: 
+        #if frequency<0:
         #    frequency=self.config['bandwidth']+frequency
         return round(float(frequency)/self.config['bandwidth']*self.config['n_chans'])%self.config['n_chans']
 
@@ -323,16 +323,16 @@ class cal:
         if self.config['flip_spectrum']:
             ret['adc_mixed'][::2]*=-1
         ret['adc_v']=ret['adc_mixed']*self.config['adc_v_scale_factor']
-        ret['input_v']=ret['adc_v']*self.get_input_scale_factor() 
+        ret['input_v']=ret['adc_v']*self.get_input_scale_factor()
         n_accs=len(raw_data)/self.config['n_chans']/2
         window=numpy.hamming(self.config['n_chans']*2)
         spectrum=numpy.zeros(self.config['n_chans'])
         ret['n_accs']=n_accs
         for acc in range(n_accs):
-            spectrum += numpy.abs((numpy.fft.rfft(ret['adc_v'][self.config['n_chans']*2*acc:self.config['n_chans']*2*(acc+1)]*window)[0:self.config['n_chans']])) 
+            spectrum += numpy.abs((numpy.fft.rfft(ret['adc_v'][self.config['n_chans']*2*acc:self.config['n_chans']*2*(acc+1)]*window)[0:self.config['n_chans']]))
         ret['adc_spectrum_dbm']  = 20*numpy.log10(spectrum/n_accs/self.config['n_chans']*6.14)
         #ret['input_spectrum_dbm']=ret['adc_spectrum_dbm']-self.config['system_bandpass']-self.config['fe_amp']-numpy.sum(self.config['rf_atten_bandpasses'],axis=0)
-	ret['input_spectrum_dbm']=ret['adc_spectrum_dbm']-(self.config['system_bandpass'])
+        ret['input_spectrum_dbm']=ret['adc_spectrum_dbm']-(self.config['system_bandpass'])
         if self.config['antenna_bandpass_calfile'] != 'none':
             ret['input_spectrum_dbuv'] = dbm_to_dbuv(ret['input_spectrum_dbm']) + self.config['antenna_factor']
         return ret
