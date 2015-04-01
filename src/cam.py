@@ -225,38 +225,30 @@ class spec:
 
     def _rf_band_switch_calc(self,rf_band=None):
         """Calculates the bitmap for the RF switches to select an RF band. Select a band between 1 and 4.\n
-        0: 0-828 MHz   1: NA  2: 900-1670 MHz  3: NA
+        1: 0-800 MHz   2: 700 - 1100   2: 1050-1650 MHz  3: 1950 - 2550
         """
-        # RF lineup:
-        # 1. RF.IN -- Amp1 --  RF.SW1.4 -- 0-828MHz filterchain -- RF.SW2.3 -- var.att1 -- Amp2 -- var.att2 -- Amp3 -- var.     att3 -- Amp4 -- RF.OUT
-        # 2.               --  RF.SW1.2 -- N/C                  -- RF.SW2.5 --
-        # 3.               --  RF.SW1.5 -- 900MHz-1.67GHz chain -- RF.SW2.2 --
-        # 4.               --  RF.SW1.3 -- N/C                  -- RF.SW2.4 --
-        #                                       bitOLD: bitNEW:
-        #    'switch1_C5' (select port1-port2) : 31,    0
-        #    'switch1_C3' (select port1-port3) : 30,    1
-        #    'switch1_C4' (select port1-port4) : 29,    2
-        #    'switch1_C6' (select port1-port5) : 28,    3
-
-        #    'switch2_C5' (select port1-port2) : 27,    4
-        #    'switch2_C3' (select port1-port3) : 26,    5
-        #    'switch2_C4' (select port1-port4) : 25,    6
-        #    'switch2_C6' (select port1-port5) : 24,    7
-        #rf_bands=[(29,26),(31,24),(28,27),(30,25)]
-        rf_bands=[(2,5),(1,7),(3,4),(0,6)]
+        #Switches wired to have correct ctr lines parallel, i.e. only one switch 1 port numbers essential ( pull low)
+        #Path:                                      
+        #1.    'switch1_C5' to 'switch2_C5'     Select (0,4) : 10001000 
+        #2.    'switch1_C4' to 'switch2_C4'     Select (2,6) : 00100010
+        #3.    'switch1_C3' to 'switch2_C3'     Select (1,5) : 01000100
+        #4.    'switch1_C6' to 'switch2_C6'     Select (3,7) : 00010001
+        
+        rf_bands = [0,2,1,3] #"set according to output port position (2-5) on rfswitch"
         if rf_band==None: rf_band=self.config['band_sel']
         assert rf_band<4,"Requested RF band is out of range (0-3)"
-        bitmap=(1<<(rf_bands[rf_band][0]))+(1<<(rf_bands[rf_band][1]))
+        bitmap=2**4+~(1<<(rf_bands[rf_band]))
+                
         return rf_band,bitmap
 
     def fe_set(self,rf_band=None,gain=None):
         """Configures the analogue box: selects bandpass filters and adjusts RF attenuators; updates global config with changes.\n
-        Select a band between 0 and 3: \n
-        \t 0: 0-828 MHz \n
-        \t 1: 750-1100 MHz \n
-        \t 2: 900-1670 MHz \n
-        \t 3: 1950-2450 MHz \n
-        Valid gain range is -94.5 to 0dB; in this case we distribute the gain evenly across the 3 attenuators. \n
+        Select a band between 1 and 4: \n
+        \t 1: 0-828 MHz \n
+        \t 2: 750-1100 MHz \n
+        \t 3: 900-1670 MHz \n
+        \t 4: 1950-2450 MHz \n
+        Valid gain range is -94.5 to 0dB; If single value, import atten settings from atten_setting_map \n
         Alternatively, pass a tuple or list to specify the three values explicitly. \n
         If no gain is specified, default to whatever's in the config file \n"""
 	if gain==None:
@@ -265,16 +257,13 @@ class spec:
         self.config['band_sel']=rf_band
         self.logger.info("Selected RF band %i."%rf_band)
 
-        #self.config['rf_atten']=0.0
-        #    self.config['rf_atten']+=atten
-        #        self.config['rf_gain']+=atten
-        #print '0x%08X\n'%bitmap
         self.cal.update_atten_bandpass(gain=gain)
 	attens=self.cal._rf_atten_calc(gain)
 
-        for (att,atten) in enumerate(attens):
-            bitmap+=(~(int(-atten*2)))<<(8+(6*int(att))) #6 bits each, following on from above rf_band_select.
+        for (att,atten) in enumerate(reversed(attens)):
+            bitmap+=((int(-atten*2)))<<(4+(6*int(att))) #6 bits each, following on from above rf_band_select.
             self.logger.info("Setting attenuator %i to %3.1f"%(att,atten))
+
         self.fpga.write_int('rf_ctrl0',bitmap)
 
     def set_valon(self,freq=None):
@@ -287,12 +276,16 @@ class spec:
         s.connect((self.config['roach_ip_str'], PORT))
 
         valon = valon_synth.Synthesizer(s)
+        valon.set_ref_select(0)
         if freq==None:
             freq=self.config['sample_clk']
         valon.set_frequency(valon_synth.SYNTH_B,freq/1.e6)
-        time.sleep(3)
-	valon.set_ref_select(0)
-	#time.sleep(3)
+        time.sleep(0.1)
+        valon.set_frequency(valon_synth.SYNTH_A,freq/1.e6)
+        time.sleep(0.1)
+        freq_chck = valon.get_frequency(valon_synth.SYNTH_B)
+        if freq_chck != (freq/1.e6):
+            raise RuntimeError ('\nValon Synthesizer ERROR!\nTried: %4.1f MHz, read back %4.1f MHz'%(freq/1.e6,freq_chck))
         s.close()
 
     def initialise(self,skip_program=False, clk_check=False, input_sel='Q',print_progress=False):
