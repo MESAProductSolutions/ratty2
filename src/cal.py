@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-import numpy,scipy,scipy.interpolate,iniparse,ratty2,corr
+import numpy,scipy,scipy.interpolate,iniparse,ratty2,corr,csv
 
 #2013-05-03 mods to support programmable attenuator spectral calibration.
 #2013-04-24 rf_atten and fe_amp rolled into one; arbitrary kwargs to _init now override config_file params.
@@ -203,8 +203,8 @@ class cal:
 
 
     def _rf_atten_calc(self,gain=None):
-        """Calculates the attenuations for each of the 3 RF attenuators in the RF box. \n
-        \t Valid range gain is -94.5 to 0dB; in this case we distribute the gain evenly across the 3 attenuators. \n
+        """Determines the attenuation for each of the 3 RF attenuators in the RF box. \n
+        \t Valid gain reange is -94.5 to 0dB; If single gain value spec'd, settings read from atten_setting_map\n
         \t Alternatively, pass a tuple or list to specify the three values explicitly. \n
         \t If no gain is specified, default to whatever's in the config file \n"""
 
@@ -215,11 +215,21 @@ class cal:
 #        elif none, pull from config file
 #       round to 0.5dB, return.
 
-
         if type(gain)==list or type(gain)==numpy.ndarray or type(gain)==tuple:
             rf_attens=gain
         elif type(gain)==int  or type(gain)==float:
-            rf_attens=[gain/3. for att in range(3)]
+            asm = open(cal_files(self.config['atten_setting_map']))
+            asmv = csv.DictReader(asm,delimiter=',')
+            gain = round(gain*2)/2
+            for line in asmv:
+                                
+                if float (line['Attenuation']) == float(gain):
+                    rf_attens = line['Att1_Sttng:Att2_Sttng:Att3_Sttng'].split(':')
+                    rf_attens = [float(rf_attens[0]),float(rf_attens[1]),float(rf_attens[2])]
+                    break
+            asm.close()
+                        
+            
         elif gain==None:
             #self.logger.info('Using attenuator settings from config file.')
             if self.config.has_key('rf_atten'):
@@ -234,7 +244,7 @@ class cal:
 
         assert len(rf_attens)==3,'Incorect number of gains specified. Please input a list/tuple of 3 numbers'
         for att in range(3):
-            assert (-31.0<=rf_attens[att]<=0),"Range for attenuator %i (%3.1f) is out of range (-31.0 to 0)."%(att,rf_attens[att])
+            assert (-31.5<=rf_attens[att]<=0),"Range for attenuator %i (%3.1f) is out of range (-31.0 to 0)."%(att,rf_attens[att])
 	#PARALLEL ATTENUATORS ONLY STEP IN 1dB STEPS - NEED TO ROUND 1dB
         return [round(att*2)/2 for att in rf_attens]
 
@@ -331,7 +341,6 @@ class cal:
         for acc in range(n_accs):
             spectrum += numpy.abs((numpy.fft.rfft(ret['adc_v'][self.config['n_chans']*2*acc:self.config['n_chans']*2*(acc+1)]*window)[0:self.config['n_chans']]))
         ret['adc_spectrum_dbm']  = 20*numpy.log10(spectrum/n_accs/self.config['n_chans']*6.14)
-        #ret['input_spectrum_dbm']=ret['adc_spectrum_dbm']-self.config['system_bandpass']-self.config['fe_amp']-numpy.sum(self.config['rf_atten_bandpasses'],axis=0)
         ret['input_spectrum_dbm']=ret['adc_spectrum_dbm']-(self.config['system_bandpass'])
         if self.config['antenna_bandpass_calfile'] != 'none':
             ret['input_spectrum_dbuv'] = dbm_to_dbuv(ret['input_spectrum_dbm']) + self.config['antenna_factor']
