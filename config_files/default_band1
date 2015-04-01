@@ -27,10 +27,11 @@ band_sel=0
 ignore_low_freq=1e6
 ignore_high_freq=899e6
 system_bandpass_calfile=system_bandpass_band1.csv
+atten_setting_map=atten_setting_map.csv
 antenna_bandpass_calfile=none
 
 #set RF attenuators to desired level in dB.  Valid range is -94.5 to 0.
-rf_atten=-90
+rf_atten=-94.5
 #Alternatively, specify the three manually! The first one corresponds to antenna side, the last one is ADC side.
 #rf_attens=-20,-20,-20
 
@@ -38,5 +39,5 @@ rf_atten=-90
 #rf_atten_gain_calfiles=system_bandpass_band1.csv, none, none
 
 #How much gain does your frontend RF chain have, in dB?
-fe_amp=70.5
+fe_amp=100
 
