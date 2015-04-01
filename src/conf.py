@@ -99,6 +99,7 @@ class rattyconf:
         self.read_float('analogue_frontend','ignore_high_freq')
         self.read_float('analogue_frontend','ignore_low_freq')
         self.config['antenna_bandpass_calfile']=self.get_line('analogue_frontend','antenna_bandpass_calfile')
+        self.config['atten_setting_map']=self.get_line('analogue_frontend','atten_setting_map')
         self.config['system_bandpass_calfile']=self.get_line('analogue_frontend','system_bandpass_calfile')
         #self.config['rf_atten_gain_calfiles']=[cf for cf in (self.get_line('analogue_frontend','rf_atten_gain_calfiles')).split(LISTDELIMIT)]
 
