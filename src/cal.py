@@ -77,7 +77,9 @@ def dbuv_to_v(dbuv):
     return (10**(dbuv/20.))/1e6
 
 def dbm_to_v(dbm):
-    return numpy.sqrt(10**(dbm/10.)/1000*50)
+    # print "\tMPS_ratty2/src/cal.py dBm =", dbm
+    # print numpy.sqrt(10.**(dbm/10.)/1000.*50.)
+    return numpy.sqrt(10.**(dbm/10.)/1000.*50.)
 
 def v_to_dbm(v):
     return 10*numpy.log10(v*v/50.*1000)
@@ -271,31 +273,41 @@ class cal:
         inter_freqs=scipy.interpolate.interp1d(cal_freqs,cal_gains,kind='linear')
         return inter_freqs(self.config['freqs'])
 
-    def get_interpolated_attens(self,filename,atten_db,freqs_hz):
-        atten=[]
-        freqs=[]
-        gains=[]
-        more=True
-        fp=open(cal_files(filename),'r')
+    def get_interpolated_attens(self, filename, atten_db, freqs_hz):
+        atten = []
+        freqs = []
+        gains = []
+        more = True
+        fp = open(cal_files(filename), 'r')
         import csv
-        fc=csv.DictReader(fp,delimiter=',')
+        fc = csv.DictReader(fp, delimiter=',')
         while(more):
             try:
-                raw_line=fc.next()
+                raw_line = fc.next()
             except:
-                more=False
+                more = False
                 break
-            #print raw_line
+
             for pair in raw_line['freq_hz:measured_gain_db'].split(';'):
-                freq,gain = pair.split(':')
+                freq, gain = pair.split(':')
                 atten.append(numpy.float(raw_line['setpoint_db']))
                 freqs.append(float(freq))
                 gains.append(float(gain))
-                #print 'Got a point on the curve: atten %f, freq %f, gain %f'%(atten[-1],freqs[-1],gains[-1])
-        #gain_setpoints=numpy.arange(self.config['rf_gain_range'][0],self.config['rf_gain_range'][1]+self.config['rf_gain_range'][2],self.config['rf_gain_range'][2])
+
+        # gain_form =\
+        #     [[0 for x in range(0, len(set(freqs)))] for x in range(0, len(set(atten)))]
+        # cnt = 0
+        # for a in range(0, len(set(atten))):
+        #     for b in range(0, len(set(freqs))):
+        #         gain_form[a][b] = gains[cnt]
+        #         cnt += 1
+
         inter_attens=scipy.interpolate.interp2d(atten,freqs,gains,kind='linear')
-        #print 'evaluating at atten settings:',atten_db
-        #print 'evaluating at freqs:',freqs_hz
+
+        # inter_attens =\
+        #     scipy.interpolate.RectBivariateSpline(numpy.array(set(atten)),
+        #             numpy.array(set(freqs)),
+        #             numpy.array(gain_form))
         return inter_attens(atten_db,freqs_hz).reshape(len(freqs_hz))
 
     def plot_ant_gain(self):

@@ -509,8 +509,11 @@ class spec:
         rv['adc_dbm']=ratty2.cal.v_to_dbm(rv['adc_rms_mv']/1000.)
         #backout fe gain
         rv['input_dbm']=rv['adc_dbm']-(numpy.mean(self.config['system_bandpass']))
-	#rv['input_dbm']=rv['adc_dbm']-numpy.sum(numpy.mean(self.config['rf_atten_bandpasses'],axis=1))
-        rv['input_rms_mv']=ratty2.cal.dbm_to_v(rv['input_dbm']*1000)
+	    #rv['input_dbm']=rv['adc_dbm']-numpy.sum(numpy.mean(self.config['rf_atten_bandpasses'],axis=1))
+        
+        # CHECK THIS! WHY dBm*1000?
+        # rv['input_rms_mv']=ratty2.cal.dbm_to_v(rv['input_dbm']*1000)
+        rv['input_rms_mv']=ratty2.cal.dbm_to_v(rv['input_dbm'])
         return rv
 
     def status_get(self):

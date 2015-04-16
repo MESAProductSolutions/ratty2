@@ -1,6 +1,8 @@
 [digital_system_parameters]
 #bitstream = r2_ratty2_32k_r201_2014_Feb_26_0858.bof.gz
-bitstream = r2_ratty2_32k_r201_2014_Mar_12_1215.bof.gz
+#bitstream = r2_ratty2_32k_r201_2014_Mar_12_1215.bof.gz
+bitstream = r2_ratty2_32k_r202_2015_Apr_14_1032.bof.gz
+
 #r2_spec_mk_32k_rf_2013_Nov_20_1103.bof.gz
 #fft shift bitmask. Set to 'auto' to try'n automatically determine this.
 #use this for CW-like signals (highest DR):
@@ -8,35 +10,35 @@ bitstream = r2_ratty2_32k_r201_2014_Mar_12_1215.bof.gz
 #use this for noise-like signals (greatest sensitivity):
 fft_shift = 32736 
 #Each ADC count represents how many volts? 250mV/512=0.00048828125
-adc_v_scale_factor=0.00031526085
+adc_v_scale_factor=0.00025802991
 #How long do you want to accumulate in seconds?
 acc_period=2
-sample_clk=1710e6
+sample_clk=1800e6
 
 [connection]
 roach_ip = 192.168.14.76
 
 [analogue_frontend]
 #   the RF switch position.
-#   0: 0 - 828 MHz
-#   1: 700 - 1100 MHz                  
-#   2: 900 - 1670 MHz
+#   0: 0 - 828 MHz   
+#   1: 700 - 1100 MHz 
+#   2: 900 - 1670 MHz  
 #   3: 1950 - 2450 MHz
 
-band_sel=2
-ignore_low_freq=900e6
-ignore_high_freq=1670e6
-system_bandpass_calfile=system_bandpass_band3.csv
+band_sel=3
+ignore_low_freq=1800e6
+ignore_high_freq=2650e6
+system_bandpass_calfile=system_bandpass_band5.csv
 atten_setting_map=atten_setting_map.csv
 antenna_bandpass_calfile=none
 
 #set RF attenuators to desired level in dB.  Valid range is -94.5 to 0.
 rf_atten=-94.5
 #Alternatively, specify the three manually! The first one corresponds to antenna side, the last one is ADC side.
-# rf_attens=-30,-30,-30
+#rf_attens=-20,-20,-20
 
 #rf_atten_gain_calfiles=none,none,none
-#rf_atten_gain_calfiles=system_bandpass_band3.csv, none, none 
+#rf_atten_gain_calfiles=system_bandpass_band4.csv, none, none 
 
 #How much gain does your frontend RF chain have, in dB?
 fe_amp=100

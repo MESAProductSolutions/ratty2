@@ -300,7 +300,8 @@ try:
 
         filename=str(int(time.time())) + ".time.h5"
         print 'Starting file %s.'%filename
-        f = h5py.File(filename, mode="w")
+        f = h5py.File(filename, mode='w')
+
         print 'fetching baseline...',
         sys.stdout.flush()
         baseline=r.get_adc_snapshot()
