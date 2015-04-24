@@ -6,7 +6,7 @@ Hard-coded for 32bit unsigned numbers.
 \nAuthor: Jason Manley, Feb 2011.
 '''
 
-import corr,time,numpy,struct,sys,logging,ratty2,cal,conf,iniparse,os,valon_synth,socket
+import corr,time,numpy,struct,sys,logging,ratty2,cal,conf,iniparse,os,valon_synth,socket,wx
 
 
 class spec:
@@ -288,22 +288,36 @@ class spec:
             raise RuntimeError ('\nValon Synthesizer ERROR!\nTried: %4.1f MHz, read back %4.1f MHz'%(freq/1.e6,freq_chck))
         s.close()
 
-    def initialise(self,skip_program=False, clk_check=False, input_sel='Q',print_progress=False):
+    def initialise(self, skip_program=False, clk_check=False, input_sel='Q',
+                   print_progress=False, progressbar=None):
         """Initialises the system to defaults."""
         if not skip_program:
             if print_progress:
                 print '\tConfiguring Valon frequency to %5.1f MHz sample clock...'%(self.config['sample_clk']/1e6),
                 sys.stdout.flush()
+
             self.set_valon()
+
             if print_progress: print 'ok'
+
+            if progressbar is not None:
+                wx.CallAfter(progressbar.SetGauge, 70)
+                wx.CallAfter(progressbar.SetText, "Configuring Valon and Programming FPGA...")
+                wx.CallAfter(progressbar.SetGauge, 75)
 
             if print_progress:
                 print '\tProgramming FPGA with %s...'%(self.config['bitstream']),
                 sys.stdout.flush()
             self.fpga.upload_program_bof('/etc/ratty2/boffiles/'+self.config['bitstream'],3333)
-            time.sleep(5)
+
+            if progressbar is not None:
+                wx.CallAfter(progressbar.SetGauge, 90)
+
+            time.sleep(2)
             #self.fpga.progdev(self.config['bitstream'])
             if print_progress: print 'ok'
+            if progressbar is not None:
+                wx.CallAfter(progressbar.SetGauge, 100)
 
         elif print_progress: print 'Reprogramming skipped.'
 
