@@ -19,7 +19,8 @@ class spec:
         self.logger.setLevel(log_level)
         self.logger.addHandler(self.lh)
 
-        if not kwargs.has_key('config_file'): kwargs['config_file']='/etc/ratty2/default'
+        if not kwargs.has_key('config_file'):
+            kwargs['config_file']='/etc/ratty2/default_band0'
 
         self.cal=ratty2.cal.cal(logger=self.logger,**kwargs)
         self.config=self.cal.config
