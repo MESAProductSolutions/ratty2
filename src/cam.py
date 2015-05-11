@@ -38,7 +38,7 @@ class spec:
         self.logger.setLevel(log_level)
         self.logger.addHandler(self.lh)
 
-        if not kwargs.has_key('config_file'):
+        if not 'config_file' in kwargs:
             kwargs['config_file'] = '/etc/ratty2/default_band0'
 
         self.cal = ratty2.cal.cal(logger=self.logger, **kwargs)
@@ -160,7 +160,7 @@ class spec:
                       clr_status='pulse',
                       flasher_en=False)
         stat = self.status_get()
-        orig_fft_shift = self.config['fft_shift']
+        # orig_fft_shift = self.config['fft_shift']
         fft_shift_adj = self.config['fft_shift']
         while not(stat['fft_overrange']):
             fft_shift_adj = fft_shift_adj << 1
@@ -582,7 +582,8 @@ class spec:
 
     def status_get(self):
         """
-        Reads and decodes the status register. Resets any error flags after reading.
+        Reads and decodes the status register.
+        Resets any error flags after reading.
         """
         value = self.fpga.read_uint('status0')
         self.ctrl_set(clr_status='pulse')
@@ -622,22 +623,14 @@ class spec:
             (self.acc_time, self.config['n_accs']))
         return self.acc_time, self.config['n_accs']
 
-    def get_adc_snapshot(self, trig_level=-1):
-        print "\nratty2...get_adc_snapshot...", trig_level
-
+    def get_adc_snapshot(self, trig_level=-1, wait_period=-1):
         if trig_level > 0:
-            print "yes"
             self.fpga.write_int('trig_level', trig_level)
-            # self.config['trig_level'] = trig_level
-            print "return after fpga write..."
             circ_capture = True
         else:
-            print "no"
             self.fpga.write_int('trig_level', 0)
-            # self.config['trig_level'] = trig_level
             circ_capture = False
 
-        print "get_adc_snapshot...done"
         return numpy.fromstring(
             self.fpga.snapshot_get('snap_adc',
                                    man_valid=True,
