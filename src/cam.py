@@ -230,6 +230,8 @@ class spec:
             bitmap += ((int(-atten*2))) << (4+(6*int(att)))
             self.logger.info("Setting attenuator %i to %3.1f" % (att, atten))
 
+        # print numpy.binary_repr(bitmap)
+
         self.fpga.write_int('rf_ctrl0', bitmap)
 
     def set_valon(self, freq=None):
@@ -268,7 +270,7 @@ class spec:
         s.close()
 
     def initialise(self, skip_program=False, clk_check=False, input_sel='Q',
-                   print_progress=False, progressbar=None):
+                   print_progress=False, progressbar=None, outputText=None):
         """Initialises the system to defaults."""
         if not skip_program:
             if print_progress:
@@ -636,7 +638,7 @@ class spec:
                                    man_valid=True,
                                    man_trig=True,
                                    circular_capture=circ_capture,
-                                   wait_period=-1)['data'],
+                                   wait_period=wait_period)['data'],
             dtype=numpy.int16).byteswap()
 
     def adc_temp_get(self):

@@ -286,7 +286,6 @@ class cal:
                                  float(rf_attens_temp[1]),
                                  float(rf_attens_temp[2])]
                     break
-            print "<<", gain, ">> <<", rf_attens, ">> file close()"
             asm.close()
 
         elif gain is None:

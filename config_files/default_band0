@@ -1,6 +1,7 @@
 [digital_system_parameters]
 # bitstream = r2_ratty2_32k_r201_2014_Mar_12_1215.bof.gz
-bitstream = r2_ratty2_32k_r202_2015_Apr_14_1032.bof.gz
+# bitstream = r2_ratty2_32k_r202_2015_Apr_14_1032.bof.gz
+bitstream = r2_ratty2_32k_r202_2015_Apr_23_1751.bof.gz
 
 #fft shift bitmask. Set to 'auto' to try'n automatically determine this.
 #use this for CW-like signals (highest DR):
