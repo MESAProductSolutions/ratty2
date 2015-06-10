@@ -211,16 +211,19 @@ class cal:
 
         if bool(self.config['nyquist_zone'] & 1):
             self.config['flip_spectrum'] = False
+            chan_offset = 0
         else:
             self.config['flip_spectrum'] = True
+            chan_offset = self.config['bandwidth']/self.config['n_chans']
 
-        start_freq = (self.config['nyquist_zone']-1)*self.config['bandwidth']
-        stop_freq = (self.config['nyquist_zone'])*self.config['bandwidth']
+        start_freq = (self.config['nyquist_zone']-1)*self.config['bandwidth']+\
+            chan_offset
+        stop_freq = (self.config['nyquist_zone'])*self.config['bandwidth']+\
+            chan_offset
         self.config['freqs'] = numpy.linspace(start_freq,
                                               stop_freq,
                                               self.config['n_chans'],
                                               endpoint=False)
-
         if (self.config['antenna_bandpass_calfile'] != 'none'):
             self.config['antenna_bandpass'] =\
                 self.get_interpolated_gains(
