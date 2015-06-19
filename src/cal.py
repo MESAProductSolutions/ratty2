@@ -268,14 +268,11 @@ class cal:
         self.config['rf_atten'] = gain
         self.config['system_bandpass'] = []
         if (self.config['system_bandpass_calfile'] != 'none'):
-            print "system_bandpass calfile found..."
-            print len(self.config['freqs'])
             self.config['system_bandpass'] = self.get_interpolated_attens(
                 filename=self.config['system_bandpass_calfile'],
                 #PARALLEL ATTENUATORS
                 atten_db=self.config['rf_atten'],
                 freqs_hz=self.config['freqs'])
-            print len(self.config['system_bandpass'])
         else:
             self.config['system_bandpass'] = numpy.ones(
                 self.config['n_chans'])*self.config['rf_atten']
