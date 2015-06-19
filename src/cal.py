@@ -211,19 +211,24 @@ class cal:
 
         if bool(self.config['nyquist_zone'] & 1):
             self.config['flip_spectrum'] = False
-            chan_offset = 0
+            self.chan_offset = 0
         else:
             self.config['flip_spectrum'] = True
-            chan_offset = self.config['bandwidth']/self.config['n_chans']
+            self.chan_offset = self.config['bandwidth']/self.config['n_chans']
 
-        start_freq = (self.config['nyquist_zone']-1)*self.config['bandwidth']+\
-            chan_offset
-        stop_freq = (self.config['nyquist_zone'])*self.config['bandwidth']+\
-            chan_offset
-        self.config['freqs'] = numpy.linspace(start_freq,
-                                              stop_freq,
-                                              self.config['n_chans'],
-                                              endpoint=False)
+        # self.start_freq =\
+        #     (self.config['nyquist_zone']-1)*self.config['bandwidth'] +\
+        #     chan_offset
+        # self.stop_freq =\
+        #     (self.config['nyquist_zone'])*self.config['bandwidth'] +\
+        #     chan_offset
+        # self.config['freqs'] = numpy.linspace(self.start_freq,
+        #                                       self.stop_freq,
+        #                                       self.config['n_chans'],
+        #                                       endpoint=False)
+
+        self.generate_freqs(self.config['n_chans'])
+
         if (self.config['antenna_bandpass_calfile'] != 'none'):
             self.config['antenna_bandpass'] =\
                 self.get_interpolated_gains(
@@ -242,6 +247,18 @@ class cal:
         for key in kwargs:
             self.config[key] = kwargs[key]
 
+    def generate_freqs(self, n_chans):
+        start_freq =\
+            (self.config['nyquist_zone']-1)*self.config['bandwidth'] +\
+            self.chan_offset
+        stop_freq =\
+            (self.config['nyquist_zone'])*self.config['bandwidth'] +\
+            self.chan_offset
+        self.config['freqs'] = numpy.linspace(start_freq,
+                                              stop_freq,
+                                              n_chans,
+                                              endpoint=False)
+
     def update_atten_bandpass(self, gain):
         """
         Extract the RF bandpass calibration from the cal file and
@@ -249,13 +266,16 @@ class cal:
         """
 
         self.config['rf_atten'] = gain
-        self.config['sys_bandpass'] = []
+        self.config['system_bandpass'] = []
         if (self.config['system_bandpass_calfile'] != 'none'):
+            print "system_bandpass calfile found..."
+            print len(self.config['freqs'])
             self.config['system_bandpass'] = self.get_interpolated_attens(
                 filename=self.config['system_bandpass_calfile'],
                 #PARALLEL ATTENUATORS
                 atten_db=self.config['rf_atten'],
                 freqs_hz=self.config['freqs'])
+            print len(self.config['system_bandpass'])
         else:
             self.config['system_bandpass'] = numpy.ones(
                 self.config['n_chans'])*self.config['rf_atten']
@@ -369,6 +389,8 @@ class cal:
                                                   gains,
                                                   kind='linear')
 
+        print "shape inter_attens", numpy.shape(inter_attens)
+        print numpy.shape(inter_attens(atten_db, freqs_hz).reshape(len(freqs_hz)))
         #TODO: Attempt to use RectBivariateSpline as Interp Method!
         # inter_attens =\
         #     scipy.interpolate.RectBivariateSpline(numpy.array(set(atten)),
@@ -445,6 +467,10 @@ class cal:
 
         ret['adc_spectrum_dbm'] = 20*numpy.log10(spectrum/n_accs/self.config[
             'n_chans']*6.14)
+        print "Spectrum Shape", numpy.shape(spectrum)
+        print self.config['n_chans']
+        print numpy.shape(ret['adc_spectrum_dbm'])
+        print "System Bandpass Shape", numpy.shape(self.config['system_bandpass'])
         ret['input_spectrum_dbm'] = ret[
             'adc_spectrum_dbm']-(self.config['system_bandpass'])
         if self.config['antenna_bandpass_calfile'] != 'none':
