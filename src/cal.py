@@ -389,8 +389,6 @@ class cal:
                                                   gains,
                                                   kind='linear')
 
-        print "shape inter_attens", numpy.shape(inter_attens)
-        print numpy.shape(inter_attens(atten_db, freqs_hz).reshape(len(freqs_hz)))
         #TODO: Attempt to use RectBivariateSpline as Interp Method!
         # inter_attens =\
         #     scipy.interpolate.RectBivariateSpline(numpy.array(set(atten)),
@@ -467,10 +465,6 @@ class cal:
 
         ret['adc_spectrum_dbm'] = 20*numpy.log10(spectrum/n_accs/self.config[
             'n_chans']*6.14)
-        print "Spectrum Shape", numpy.shape(spectrum)
-        print self.config['n_chans']
-        print numpy.shape(ret['adc_spectrum_dbm'])
-        print "System Bandpass Shape", numpy.shape(self.config['system_bandpass'])
         ret['input_spectrum_dbm'] = ret[
             'adc_spectrum_dbm']-(self.config['system_bandpass'])
         if self.config['antenna_bandpass_calfile'] != 'none':
