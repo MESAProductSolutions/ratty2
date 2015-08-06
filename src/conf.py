@@ -95,7 +95,7 @@ class rattyconf:
         self.config['fpga_clk'] = self.config['sample_clk']/8
         self.config['adc_levels_acc_len'] = 4500000./512.
         self.config['adc_type'] = 'mkadc 1800Msps, 10b, single input'
-        self.config['pfb_scale_factor'] = 148.2
+        self.config['pfb_scale_factor'] = 143.2
         # (148.2) a scaling co-efficient corresponding to the gain through
         # the digital filterbank
 
