@@ -211,28 +211,46 @@ class spec:
         explicitly. \n
         If no gain is specified, default to whatever's in the config file \n
         """
-
+        ts = 0.1
         if gain is None:
             gain = self.config['rf_atten']
-
+        rf_band_new = rf_band
         # 8-bits
+        """Keep current switch and attens settings"""
+        attens_interm = self.cal._rf_atten_calc(self.config['rf_atten'])
+        att_l = len(attens_interm)
         rf_band, bitmap =\
-            self._rf_band_switch_calc(rf_band=rf_band)
-
-        self.config['band_sel'] = rf_band
-        self.logger.info("Selected RF band %i." % rf_band)
-
+            self._rf_band_switch_calc(rf_band=self.config['band_sel'])
+        bitmap_interm = bitmap
         self.cal.update_atten_bandpass(gain=gain)
-        attens = self.cal._rf_atten_calc(gain)
+        """Step up attenuation to maximum, set back-to-front"""
+        for x in range(att_l):
+            attens = self.cal._rf_atten_calc(float(-94.5))
+            for c in range(att_l-(x+1)):
+                attens[c] = attens_interm[c]
+            for (att, atten) in enumerate(reversed(attens)):
+                #6 bits each atten, added to 4-bit rf_band_select.
+                bitmap += ((int(-atten*2))) << (4+(6*int(att)))
+            self.fpga.write_int('rf_ctrl0', bitmap)
+            time.sleep(ts)
+            bitmap = bitmap_interm
+        """Set new switch and atten vars"""
+        rf_band, bitmap_interm =\
+            self._rf_band_switch_calc(rf_band=rf_band_new)
+        self.logger.info("Selected RF band %i." % rf_band)
+        self.config['band_sel'] = rf_band
+        attens_new = self.cal._rf_atten_calc(self.config['rf_atten']) 
+        """Toggle switch and attens, front """
+        for x in range(att_l+1): 
+            if x > 0:
+                attens[x-1]=attens_new[x-1]
+            for (att, atten) in enumerate(reversed(attens)):
+                #6 bits each atten, added to 4-bit rf_band_select.
+                bitmap += ((int(-atten*2))) << (4+(6*int(att)))  
+            self.fpga.write_int('rf_ctrl0', bitmap)
+            time.sleep(ts)
+            bitmap = bitmap_interm  
 
-        for (att, atten) in enumerate(reversed(attens)):
-            #6 bits each, following on from above rf_band_select.
-            bitmap += ((int(-atten*2))) << (4+(6*int(att)))
-            self.logger.info("Setting attenuator %i to %3.1f" % (att, atten))
-
-        # print numpy.binary_repr(bitmap)
-
-        self.fpga.write_int('rf_ctrl0', bitmap)
 
     def set_valon(self, freq=None):
         '''
