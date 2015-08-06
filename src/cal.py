@@ -34,8 +34,8 @@ def cal_files(filename):
 
 def smoothList(list, strippedXs=False, degree=10):
     if strippedXs is True:
-        return Xs[0:-(len(list)-(len(list)-degree+1))]
-    smoothed = [0]*(len(list)-degree+1)
+        return Xs[0:-(len(list) - (len(list) - degree + 1))]
+    smoothed = [0] * (len(list) - degree + 1)
     for i in range(len(smoothed)):
         smoothed[i] = sum(list[i:i+degree])/float(degree)
     return smoothed
@@ -247,7 +247,7 @@ class cal:
         for key in kwargs:
             self.config[key] = kwargs[key]
 
-    def generate_freqs(self, n_chans):
+    def generate_freqs(self, n_chans): 
         start_freq =\
             (self.config['nyquist_zone']-1)*self.config['bandwidth'] +\
             self.chan_offset
@@ -272,6 +272,7 @@ class cal:
                 filename=self.config['system_bandpass_calfile'],
                 #PARALLEL ATTENUATORS
                 atten_db=self.config['rf_atten'],
+                ######
                 freqs_hz=self.config['freqs'])
         else:
             self.config['system_bandpass'] = numpy.ones(
@@ -333,7 +334,7 @@ class cal:
     def plot_bandshape(self, freqs):
         import pylab
         #TODO: Undefined "bandshape"
-        pylab.plot(bandshape(freqs))
+        pylab.plot(self.config['system_bandpass'](freqs))
         pylab.title('Bandpass calibration profile')
         pylab.xlabel('Frequency (Hz)')
         pylab.ylabel('Relative response (dB)')
@@ -347,7 +348,7 @@ class cal:
         pylab.title('RF attenuator mapping')
         pylab.xlabel('Requested value (dB)')
         pylab.ylabel('Actual value (dB)')
-
+  
     def get_interpolated_gains(self, filename):
         """
         Retrieves antenna gain mapping from bandpass csv files and
@@ -357,16 +358,14 @@ class cal:
         inter_freqs = scipy.interpolate.interp1d(cal_freqs,
                                                  cal_gains,
                                                  kind='linear')
-
+ 
         return inter_freqs(self.config['freqs'])
 
     def get_interpolated_attens(self, filename, atten_db, freqs_hz):
-        atten = []
         freqs = []
         gains = []
         more = True
         fp = open(cal_files(filename), 'r')
-        # import csv
         fc = csv.DictReader(fp, delimiter=',')
         while(more):
             try:
@@ -374,25 +373,22 @@ class cal:
             except:
                 more = False
                 break
-
-            for pair in raw_line['freq_hz:measured_gain_db'].split(';'):
-                freq, gain = pair.split(':')
-                atten.append(numpy.float(raw_line['setpoint_db']))
-                freqs.append(float(freq))
-                gains.append(float(gain))
-
-        inter_attens = scipy.interpolate.interp2d(atten,
-                                                  freqs,
+            if float(atten_db) == float(raw_line['setpoint_db']):
+                for pair in raw_line['freq_hz:measured_gain_db'].split(';'):
+                    freq, gain = pair.split(':')
+                    freqs.append(float(freq))
+                    gains.append(float(gain)) 
+        if not(freqs[0] <= freqs_hz[0]):
+            freqs.insert(0, 0.0)
+            gains.insert(0, gains[0])
+        if not(freqs[len(freqs)-1] >= freqs_hz[len(freqs_hz)-1]):
+            freqs.append(freqs_hz[len(freqs_hz)-1])
+            gains.append(gains[len(gains)-1])
+        inter_attens = scipy.interpolate.interp1d(freqs,
                                                   gains,
                                                   kind='linear')
 
-        #TODO: Attempt to use RectBivariateSpline as Interp Method!
-        # inter_attens =\
-        #     scipy.interpolate.RectBivariateSpline(numpy.array(set(atten)),
-        #             numpy.array(set(freqs)),
-        #             numpy.array(gain_form))
-
-        return inter_attens(atten_db, freqs_hz).reshape(len(freqs_hz))
+        return inter_attens(freqs_hz).reshape(len(freqs_hz))
 
     def plot_ant_gain(self):
         """Plots the antenna gain."""
@@ -423,9 +419,8 @@ class cal:
         """
         #if frequency<0:
         #    frequency=self.config['bandwidth']+frequency
-        return round(
-            float(frequency)/self.config['bandwidth']*self.config['n_chans']
-            ) % self.config['n_chans']
+        return\
+            round(float(frequency) / self.config['bandwidth'] * self.config['n_chans']) % self.config['n_chans']
 
     def get_input_scale_factor(self):
         """
@@ -433,7 +428,21 @@ class cal:
         voltage to the actual frontend input voltage. Does not
         perform any frequency-dependent calibration.
         """
-        return 1./(10.**((numpy.mean(self.config['system_bandpass']))/20.))
+        x_low = x_high = None
+        for x in range(len(self.config['freqs'])):
+            if float(self.config['freqs'][x]) >\
+                float(self.config['ignore_low_freq']) and\
+                    (x_low is None):
+                x_low = x
+            elif float(self.config['freqs'][x]) >\
+                float(self.config['ignore_high_freq']) or\
+                (x == (len(self.config['freqs'])-1)):
+                x_high = x
+                passband_mean =\
+                    numpy.mean(self.config['system_bandpass'][x_low:x_high])
+                break
+
+        return 1./(10.**(passband_mean/20.))
 
     def calibrate_adc_snapshot(self, raw_data):
         """
@@ -457,8 +466,7 @@ class cal:
             spectrum +=\
                 numpy.abs((numpy.fft.rfft(
                     ret['adc_v'][self.config['n_chans']*2*acc:self.config[
-                        'n_chans']*2*(acc+1)]*window
-                    )[0:self.config['n_chans']]))
+                        'n_chans']*2*(acc+1)]*window)[0:self.config['n_chans']]))
 
         ret['adc_spectrum_dbm'] = 20*numpy.log10(spectrum/n_accs/self.config[
             'n_chans']*6.14)
