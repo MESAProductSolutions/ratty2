@@ -2,7 +2,8 @@
 #bitstream = r2_ratty2_32k_r201_2014_Feb_26_0858.bof.gz
 #bitstream = r2_ratty2_32k_r201_2014_Mar_12_1215.bof.gz
 #bitstream = r2_ratty2_32k_r202_2015_Apr_14_1032.bof.gz
-bitstream = r2_ratty2_32k_r202_2015_Apr_23_1751.bof.gz
+#bitstream = r2_ratty2_32k_r202_2015_Apr_23_1751.bof.gz
+bitstream = r2_ratty2_32k_r202_2015_Jun_05_1745.bof.gz
 
 #r2_spec_mk_32k_rf_2013_Nov_20_1103.bof.gz
 #fft shift bitmask. Set to 'auto' to try'n automatically determine this.
@@ -17,7 +18,7 @@ acc_period=2
 sample_clk=1710e6
 
 [connection]
-roach_ip = 192.168.14.76
+roach_ip = 192.168.14.48
 
 [analogue_frontend]
 #   the RF switch position.
