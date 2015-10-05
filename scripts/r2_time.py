@@ -205,7 +205,7 @@ def getUnpackedData():
                 'adc_level': f['adc_level'][cnt],
                 'input_level': f['input_level'][cnt],
                 'timestamp': f['timestamp'][cnt],
-                'file_cnt': f['file_cnt'][cnt],
+                # 'file_cnt': f['file_cnt'][cnt],
                 'adc_temp': f['adc_temp'][cnt]}
         cnt += 1
 
