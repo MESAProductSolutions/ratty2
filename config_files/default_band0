@@ -3,6 +3,7 @@
 # bitstream = r2_ratty2_32k_r202_2015_Apr_14_1032.bof.gz
 #bitstream = r2_ratty2_32k_r202_2015_Apr_23_1751.bof.gz
 bitstream = r2_ratty2_32k_r202_2015_Jun_05_1745.bof.gz
+#bitstream = r2_ratty2_32k_r203_2015_Aug_17_1355.bof.gz
 
 #fft shift bitmask. Set to 'auto' to try'n automatically determine this.
 #use this for CW-like signals (highest DR):
@@ -10,13 +11,13 @@ bitstream = r2_ratty2_32k_r202_2015_Jun_05_1745.bof.gz
 #use this for noise-like signals (greatest sensitivity):
 fft_shift = 32736 
 #Each ADC count represents how many volts? 250mV/512=0.00048828125
-adc_v_scale_factor=0.000334
+adc_v_scale_factor=0.00048828125
 #How long do you want to accumulate in seconds?
 acc_period=2
 sample_clk=1800e6
 
 [connection]
-roach_ip = 192.168.14.48
+roach_ip = 192.168.14.49
 # roach_ip = 192.168.14.65 # old mixing ratty2
 
 [analogue_frontend]
@@ -27,10 +28,10 @@ roach_ip = 192.168.14.48
 #   3: 1950 - 2450 MHz 
 
 band_sel=0
-ignore_low_freq=1e6
-ignore_high_freq=899e6
+ignore_low_freq=20e6
+ignore_high_freq=750e6
 system_bandpass_calfile=system_bandpass_band1.csv
-# system_bandpass_calfile=none
+#system_bandpass_calfile=none
 atten_setting_map=atten_setting_map.csv
 antenna_bandpass_calfile=none
 
@@ -38,5 +39,5 @@ antenna_bandpass_calfile=none
 rf_atten=-94.5
 
 #How much gain does your frontend RF chain have, in dB?
-fe_amp=100
+fe_amp=70
 

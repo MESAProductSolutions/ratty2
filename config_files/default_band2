@@ -12,13 +12,13 @@ bitstream = r2_ratty2_32k_r202_2015_Jun_05_1745.bof.gz
 #use this for noise-like signals (greatest sensitivity):
 fft_shift = 32736 
 #Each ADC count represents how many volts? 250mV/512=0.00048828125
-adc_v_scale_factor=0.00031526085
+adc_v_scale_factor=0.00048828125
 #How long do you want to accumulate in seconds?
 acc_period=2
 sample_clk=1710e6
 
 [connection]
-roach_ip = 192.168.14.48
+roach_ip = 192.168.14.49
 
 [analogue_frontend]
 #   the RF switch position.
@@ -28,8 +28,8 @@ roach_ip = 192.168.14.48
 #   3: 1950 - 2450 MHz
 
 band_sel=2
-ignore_low_freq=900e6
-ignore_high_freq=1670e6
+ignore_low_freq=950e6
+ignore_high_freq=1660e6
 system_bandpass_calfile=system_bandpass_band3.csv
 atten_setting_map=atten_setting_map.csv
 antenna_bandpass_calfile=none
