@@ -20,7 +20,7 @@ acc_period=0.5
 sample_clk=1800e6
 
 [connection]
-roach_ip = 192.168.10.48
+roach_ip = 192.168.1.49
 # roach_ip = 192.168.14.65 # old mixing ratty2
 
 [analogue_frontend]

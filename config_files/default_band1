@@ -20,7 +20,7 @@ acc_period=2
 sample_clk=1200e6
 
 [connection]
-roach_ip = 192.168.14.49
+roach_ip = 192.168.1.49
 
 [analogue_frontend]
 #   the RF switch position.
