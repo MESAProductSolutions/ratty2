@@ -4,7 +4,8 @@
 # bitstream = r2_ratty2_32k_r202_2015_Apr_14_1032.bof.gz
 # bitstream = r2_ratty2_32k_r202_2015_Apr_23_1751.bof.gz
 # bitstream = r2_ratty2_32k_r202_2015_Jun_05_1745.bof.gz
-bitstream = r2_ratty2_32k_r203_2015_Aug_17_1355.bof.gz
+# bitstream = r2_ratty2_32k_r203_2015_Oct_07_1819.bof.gz
+bitstream = r2_ratty2_32k_r203_2015_Nov_27_1631.bof.gz
 
 #r2_spec_mk_32k_rf_2013_Nov_20_1103.bof.gz
 #fft shift bitmask. Set to 'auto' to try'n automatically determine this.
@@ -19,7 +20,7 @@ acc_period=2
 sample_clk=1710e6
 
 [connection]
-roach_ip = 192.168.14.49
+roach_ip = 192.168.10.48
 
 [analogue_frontend]
 #   the RF switch position.
@@ -29,8 +30,8 @@ roach_ip = 192.168.14.49
 #   3: 1950 - 2450 MHz
 
 band_sel=2
-ignore_low_freq=950e6
-ignore_high_freq=1660e6
+ignore_low_freq=875e6
+ignore_high_freq=1670e6
 system_bandpass_calfile=system_bandpass_band3.csv
 atten_setting_map=atten_setting_map.csv
 antenna_bandpass_calfile=none
@@ -44,5 +45,5 @@ rf_atten=-94.5
 #rf_atten_gain_calfiles=system_bandpass_band3.csv, none, none 
 
 #How much gain does your frontend RF chain have, in dB?
-fe_amp=100
+fe_amp=68
 
