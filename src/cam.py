@@ -207,7 +207,7 @@ class spec:
         If no gain is specified, default to whatever's in the config file \n
         """
         initial = not(gain)
-        switch_cnt = int(6)  # No. of switch ctrl lines (bits)
+        switch_cnt = self.config['rf_switch_cnt']  # No. of switch ctrl lines (bits)
         if gain is None:  # set to config_file or existing value
             gain = self.config['rf_atten']
         gain = round(gain * 2.) / 2.
