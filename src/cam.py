@@ -186,8 +186,9 @@ class spec:
         rf_bands = self.config['rf_switch_layout']
         if rf_band is None:
             rf_band = self.config['band_sel']
-        assert rf_band < len(rf_bands), "Requested RF band is out of range (0-3)"
-        bitmap = 2 ** switch_cnt + ~(1 << (rf_bands[rf_band]))
+        assert rf_band <= len(rf_bands), "Requested RF band is out of range" +\
+            "(1-%i)" % len(rf_bands)
+        bitmap = 2 ** switch_cnt + ~(1 << (rf_bands[rf_band - 1] - 1))
         return rf_band, bitmap
 
     def fe_set(self, rf_band=None, gain=None):
