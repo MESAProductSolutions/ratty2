@@ -102,9 +102,9 @@ class spec:
 
         while (rf_level < self.config[
                 'desired_rf_level'
-                ]-tolerance or rf_level > self.config[
+                ] - tolerance or rf_level > self.config[
                 'desired_rf_level'
-                ]+tolerance) and n_tries < max_n_tries:
+                ] + tolerance) and n_tries < max_n_tries:
 
             rf_level = self.adc_amplitudes_get()['adc_dbm']
             difference = self.config['desired_rf_level'] - rf_level
@@ -177,22 +177,17 @@ class spec:
 
         return (fft_shift_adj & self.config['fft_shift'])
 
-    def _rf_band_switch_calc(self, rf_band=None):
+    def _rf_band_switch_calc(self, switch_cnt, rf_band=None):
         """
         Calculates the bitmap for the RF switches to select an RF band.
         Select a band between 1 and 4.\n
         1: 0-800 MHz   2: 700 - 1100   2: 1050-1650 MHz  3: 1950 - 2550
         """
-
-        #"set according to output port position (2-5) on rfswitch"
-        rf_bands = [0, 2, 1, 3]
-
+        rf_bands = self.config['rf_switch_layout']
         if rf_band is None:
             rf_band = self.config['band_sel']
-
-        assert rf_band < 4, "Requested RF band is out of range (0-3)"
-        bitmap = 2**4+~(1 << (rf_bands[rf_band]))
-
+        assert rf_band < len(rf_bands), "Requested RF band is out of range (0-3)"
+        bitmap = 2 ** switch_cnt + ~(1 << (rf_bands[rf_band]))
         return rf_band, bitmap
 
     def fe_set(self, rf_band=None, gain=None):
@@ -211,49 +206,53 @@ class spec:
         explicitly. \n
         If no gain is specified, default to whatever's in the config file \n
         """
-        ts = 0.1
-        if gain is None:
+        initial = not(gain)
+        switch_cnt = int(6)  # No. of switch ctrl lines (bits)
+        if gain is None:  # set to config_file or existing value
             gain = self.config['rf_atten']
-        rf_band_new = rf_band
-        # 8-bits
-        """Keep current switch and attens settings"""
+        gain = round(gain * 2.) / 2.
+        rf_band_new = rf_band  # record new variables and keep existing config
         attens_interm = self.cal._rf_atten_calc(self.config['rf_atten'])
         att_l = len(attens_interm)
-        rf_band, bitmap =\
-            self._rf_band_switch_calc(rf_band=self.config['band_sel'])
-        bitmap_interm = bitmap
-        cnt = 0
-        self.cal.update_atten_bandpass(gain=gain)
-        """Step up attenuation to maximum, set back-to-front"""
-        for x in range(att_l):
-            attens = self.cal._rf_atten_calc(float(-94.5))
-            for c in range(att_l-(x+1)):
-                attens[c] = attens_interm[c]
-            for (att, atten) in enumerate(reversed(attens)):
-                #6 bits each atten, added to 4-bit rf_band_select.
-                bitmap += ((int(-atten*2))) << (4+(6*int(att)))
-            self.fpga.write_int('rf_ctrl0', bitmap)
-            time.sleep(ts)
-            bitmap = bitmap_interm
-            cnt += 1
-        """Set new switch and atten vars"""
         rf_band, bitmap_interm =\
-            self._rf_band_switch_calc(rf_band=rf_band_new)
-        bitmap = bitmap_interm
+            self._rf_band_switch_calc(switch_cnt,
+                                      rf_band=self.config['band_sel'])
+        attens = self.cal._rf_atten_calc(float(-94.5))  # max attenuation
+        bitmap_check = bitmap_interm
+        for (att, atten) in enumerate(reversed(attens_interm)):
+            bitmap_check += (int(-atten * 2)) << (int(switch_cnt) + (6 * int(att)))
+        for x in range(att_l):  # Set attenuation to maximum, back-to-front
+            bitmap = bitmap_interm
+            attens_interm[-1 - x] = attens[-1 - x]
+            for (att, atten) in enumerate(reversed(attens_interm)):
+                bitmap += (int(-atten * 2)) << (int(switch_cnt) + (6 * int(att)))
+            if initial:
+                bitmap = 2 ** 24 - 1
+                self.fpga.write_int('rf_ctrl0', bitmap)
+                bitmap_check = bitmap
+                break
+            elif bitmap == bitmap_check:
+                continue
+            else:
+                self.fpga.write_int('rf_ctrl0', bitmap)
+                bitmap_check = bitmap
+        self.cal.update_atten_bandpass(gain=gain)  # updates config['rf_atten']
+        rf_band, bitmap_interm =\
+            self._rf_band_switch_calc(switch_cnt, rf_band=rf_band_new)
         self.logger.info("Selected RF band %i." % rf_band)
         self.config['band_sel'] = rf_band
         attens_new = self.cal._rf_atten_calc(self.config['rf_atten'])
-        """Toggle switch and attens, front """
-        for x in range(att_l): 
-            attens[x] = attens_new[x]
-            for (att, atten) in enumerate(reversed(attens)):
-                #6 bits each atten, added to 4-bit rf_band_select.
-                bitmap += ((int(-atten*2))) << (4+(6*int(att)))
-            self.fpga.write_int('rf_ctrl0', bitmap)
-            cnt += 1
-            time.sleep(ts)
+        for x in range(att_l + 1):  # Toggle switch, then attens (front->back)
             bitmap = bitmap_interm
-
+            if x > 0:
+                attens[x - 1] = attens_new[x - 1]
+            for (att, atten) in enumerate(reversed(attens)):
+                bitmap += ((int(-atten * 2))) << (int(switch_cnt) + (6 * int(att)))
+            if bitmap == bitmap_check:
+                continue
+            else:
+                self.fpga.write_int('rf_ctrl0', bitmap)
+                bitmap_check = bitmap
 
     def set_valon(self, freq=None):
         '''
@@ -275,19 +274,19 @@ class spec:
             freq = self.config['sample_clk']
 
         #TODO: Check why both synths are set?
-        valon.set_frequency(valon_synth.SYNTH_B, freq/1.e6)
+        valon.set_frequency(valon_synth.SYNTH_B, freq / 1.e6)
         time.sleep(0.1)
-        valon.set_frequency(valon_synth.SYNTH_A, freq/1.e6)
+        valon.set_frequency(valon_synth.SYNTH_A, freq / 1.e6)
         time.sleep(0.1)
 
         freq_chck = valon.get_frequency(valon_synth.SYNTH_B)
 
-        if freq_chck != (freq/1.e6):
+        if freq_chck != (freq / 1.e6):
             raise\
                 RuntimeError(
                     '\nValon Synthesizer ERROR!\
                     Tried: %4.1f MHz, read back %4.1f MHz' %
-                    (freq/1.e6, freq_chck))
+                    (freq / 1.e6, freq_chck))
         s.close()
 
     def initialise(self, skip_program=False, clk_check=False, input_sel='Q',
@@ -297,7 +296,7 @@ class spec:
             if print_progress:
                 print '\
                     \tConfiguring Valon frequency to %5.1f MHz...'\
-                    % (self.config['sample_clk']/1e6),
+                    % (self.config['sample_clk'] / 1e6),
 
                 sys.stdout.flush()
 
@@ -318,7 +317,7 @@ class spec:
                 sys.stdout.flush()
 
             self.fpga.upload_program_bof(
-                '/etc/ratty2/boffiles/'+self.config['bitstream'], 3333)
+                '/etc/ratty2/boffiles/' + self.config['bitstream'], 3333)
 
             if progressbar is not None:
                 wx.CallAfter(progressbar.SetGauge, 90)
@@ -344,8 +343,8 @@ class spec:
             print '\tSelecting RF band %i (%i-%i MHz) and adjusting\
                     attenuators for %4.1fdB total attenuation...' %\
                 (self.config['band_sel'],
-                 self.config['ignore_low_freq']/1.e6,
-                 self.config['ignore_high_freq']/1.e6,
+                 self.config['ignore_low_freq'] / 1.e6,
+                 self.config['ignore_high_freq'] / 1.e6,
                  self.config['rf_atten']),
         self.fe_set()
         if print_progress:
