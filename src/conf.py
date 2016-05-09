@@ -109,6 +109,8 @@ class rattyconf:
         self.config['roach_ip_str'] = self.get_line(
             'connection',
             'roach_ip')
+        self.config['rta_serial_number'] = self.get_line('connection',
+                                                         'rta_serial_number')
         self.config['rf_switch_layout'] = \
             [int(x) for x in self.get_line('analogue_frontend',
                                            'rf_switch_layout').split(',')]
