@@ -129,6 +129,9 @@ class rattyconf:
         self.config['system_bandpass_calfile'] =\
             self.get_line('analogue_frontend',
                           'system_bandpass_calfile')
+        self.config['rf_ip1db_map'] =\
+            self.get_line('analogue_frontend',
+                          'rf_ip1db_map')
         self.read_float('analogue_frontend', 'rf_atten')
 
     def write(self, section, variable, value):
