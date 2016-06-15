@@ -207,6 +207,7 @@ class spec:
         If no gain is specified, default to whatever's in the config file \n
         Attenuators / switches set in sequence to limit self-generated RFI\n
         """
+        self.config['fe_write'] = True  # Flag for front-end ctrl line check
         initial = not(gain)
         switch_cnt = self.config['rf_switch_cnt']  # No. of switch ctrl lines (bits)
         if gain is None:  # set to config_file or existing value
@@ -266,12 +267,11 @@ class spec:
             time.sleep(0.2)  # shortest safe delay for succesful readback
             fb_bitmap = self.fpga.read_uint('rf_fb0')
             if bitmap != fb_bitmap:
-                raise\
-                    RuntimeError('\nFront-End Control Error: \
-                                 \n%s\twritten bitstream, \n%s\treturned\
-                                 bitsream' % (bin(bitmap), bin(fb_bitmap)))
-            else:
-                return True
+                err_mssge = 'Front-End Control Error:\n%s\twritten bitstream\
+                    \n%s\treturned bitstream' % (bin(bitmap), bin(fb_bitmap))
+                self.logger.error(err_mssge)
+                print err_mssge
+                self.config['fe_write'] = False
 
     def set_valon(self, freq=None):
         '''

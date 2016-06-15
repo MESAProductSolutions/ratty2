@@ -64,6 +64,7 @@ class rattyconf:
         return exists
 
     def read_common(self):
+        print '\nStart read common\n'
         if not self.file_exists():
             raise RuntimeError(
                 'Error opening config file or runtime variables.')
