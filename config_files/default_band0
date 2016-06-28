@@ -1,6 +1,6 @@
 [digital_system_parameters]
-bitstream = r2_ratty2_32k_r203_2015_Oct_07_1819.bof.gz
-#bitstream = r2_ratty2_32k_r203_2015_Nov_27_1631.bof.gz
+#bitstream = r2_ratty2_32k_r203_2015_Oct_07_1819.bof.gz
+bitstream = r2_ratty2_32k_r203_2015_Nov_27_1631.bof.gz
 #bitstreamV = r2_ratty2_r203_maxhold_2015_Dec_10_1722.bof.gz
 
 #fft shift bitmask. Set to 'auto' to try'n automatically determine this.

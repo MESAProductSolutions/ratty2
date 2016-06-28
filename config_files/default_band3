@@ -1,6 +1,6 @@
 [digital_system_parameters]
-bitstream = r2_ratty2_32k_r203_2015_Oct_07_1819.bof.gz
-#bitstream = r2_ratty2_32k_r203_2015_Nov_27_1631.bof.gz
+#bitstream = r2_ratty2_32k_r203_2015_Oct_07_1819.bof.gz
+bitstream = r2_ratty2_32k_r203_2015_Nov_27_1631.bof.gz
 #bitstream = r2_ratty2_r203_max_hold_2015_Dec_10_1722.bof.gz
 
 #r2_spec_mk_32k_rf_2013_Nov_20_1103.bof.gz
