@@ -187,7 +187,7 @@ class spec:
             rf_band = self.config['band_sel']
         assert rf_band <= len(rf_bands), "Requested RF band is out of range" +\
             "(1-%i)" % len(rf_bands)
-        bitmap = 2 ** switch_cnt + ~(1 << (rf_bands[rf_band - 1] - 1))
+        bitmap = 2 ** switch_cnt + ~(1 << (rf_bands[rf_band]))
         return rf_band, bitmap
 
     def fe_set(self, rf_band=None, gain=None):
@@ -227,7 +227,8 @@ class spec:
             bitmap = bitmap_interm
             attens_interm[-1 - x] = attens[-1 - x]
             for (att, atten) in enumerate(reversed(attens_interm)):
-                bitmap += (int(-atten * 2)) << (int(switch_cnt) + (6 * int(att)))
+                bitmap += (int(-atten * 2)) <<\
+                    (int(switch_cnt) + (6 * int(len(attens) - 1 - att)))
             if initial:
                 bitmap = 2 ** 24 - 1
                 self.fe_write(bitmap)
@@ -248,9 +249,9 @@ class spec:
             bitmap = bitmap_interm
             if x > 0:
                 attens[x - 1] = attens_new[x - 1]
-            for (att, atten) in enumerate(reversed(attens)):
-                bitmap += ((int(-atten * 2))) << (int(switch_cnt) +
-                                                  (6 * int(att)))
+            for (att, atten) in enumerate(attens):
+                bitmap += ((int(-atten * 2))) <<\
+                    (int(switch_cnt) + (6 * int(len(attens) - 1 - att)))
             if bitmap == bitmap_check:
                 continue
             else:
@@ -264,7 +265,7 @@ class spec:
         '''
         self.fpga.write_int('rf_ctrl0', bitmap)
         if read:
-            time.sleep(0.2)  # shortest safe delay for succesful readback
+            time.sleep(0.4)  # shortest safe delay for succesful readback
             fb_bitmap = self.fpga.read_uint('rf_fb0')
             if bitmap != fb_bitmap:
                 err_mssge = 'Front-End Control Error:\n%s\twritten bitstream\
