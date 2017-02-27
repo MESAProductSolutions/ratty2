@@ -23,7 +23,7 @@ import cal
 # import os
 import valon_synth
 import socket
-import wx
+# import wx
 
 
 class spec:
@@ -305,11 +305,11 @@ class spec:
             if print_progress:
                 print 'ok'
 
-            if progressbar is not None:
-                wx.CallAfter(progressbar.SetGauge, 70)
-                wx.CallAfter(progressbar.SetText,
-                             "Configuring Valon and Programming FPGA...")
-                wx.CallAfter(progressbar.SetGauge, 75)
+            # if progressbar is not None:
+            #     wx.CallAfter(progressbar.SetGauge, 70)
+            #     wx.CallAfter(progressbar.SetText,
+            #                  "Configuring Valon and Programming FPGA...")
+            #     wx.CallAfter(progressbar.SetGauge, 75)
 
             if print_progress:
                 print '\tProgramming FPGA with %s...' %\
@@ -319,14 +319,14 @@ class spec:
             self.fpga.upload_program_bof(
                 '/etc/ratty2/boffiles/' + self.config['bitstream'], 3333)
 
-            if progressbar is not None:
-                wx.CallAfter(progressbar.SetGauge, 90)
+            # if progressbar is not None:
+            #     wx.CallAfter(progressbar.SetGauge, 90)
 
             time.sleep(2)
             if print_progress:
                 print 'ok'
-            if progressbar is not None:
-                wx.CallAfter(progressbar.SetGauge, 100)
+            # if progressbar is not None:
+            #     wx.CallAfter(progressbar.SetGauge, 100)
 
         elif print_progress:
             print 'Reprogramming skipped.'
