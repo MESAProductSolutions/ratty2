@@ -462,8 +462,8 @@ class cal:
         window = numpy.hamming(self.config['n_chans']*2)
         spectrum = numpy.zeros(self.config['n_chans'])
         ret['n_accs'] = n_accs
-        if n_accs < 1:
-            n_accs = 1
+        # if n_accs < 1:
+        #     n_accs = 1
         for acc in range(n_accs):
             # print "for acc ", acc
             spectrum +=\
