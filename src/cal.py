@@ -420,7 +420,8 @@ class cal:
         #if frequency<0:
         #    frequency=self.config['bandwidth']+frequency
         return\
-            round(float(frequency) / self.config['bandwidth'] * self.config['n_chans']) % self.config['n_chans']
+            int(round(float(frequency) / self.config['bandwidth'] *
+                self.config['n_chans']) % self.config['n_chans'])
 
     def get_input_scale_factor(self):
         """
@@ -461,15 +462,16 @@ class cal:
         window = numpy.hamming(self.config['n_chans']*2)
         spectrum = numpy.zeros(self.config['n_chans'])
         ret['n_accs'] = n_accs
-
+        if n_accs < 1:
+            n_accs = 1
         for acc in range(n_accs):
+            # print "for acc ", acc
             spectrum +=\
                 numpy.abs((numpy.fft.rfft(
-                    ret['adc_v'][self.config['n_chans']*2*acc:self.config[
-                        'n_chans']*2*(acc+1)]*window)[0:self.config['n_chans']]))
-
-        ret['adc_spectrum_dbm'] = 20*numpy.log10(spectrum/n_accs/self.config[
-            'n_chans']*6.14)
+                    ret['adc_v'][self.config['n_chans']*2*acc:\
+                                 self.config['n_chans']*2*(acc+1)]*window)[0:self.config['n_chans']]))
+        ret['adc_spectrum_dbm'] =\
+            20*numpy.log10(spectrum/n_accs/self.config['n_chans']*6.14)
         ret['input_spectrum_dbm'] = ret[
             'adc_spectrum_dbm']-(self.config['system_bandpass'])
         if self.config['antenna_bandpass_calfile'] != 'none':
