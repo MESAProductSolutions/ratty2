@@ -60,7 +60,6 @@ class spec:
             self.config['katcp_port'],
             timeout=3,
             logger=self.logger)
-
         time.sleep(0.2)
         try:
             self.fpga.ping()
@@ -186,8 +185,9 @@ class spec:
         rf_bands = self.config['rf_switch_layout']
         if rf_band is None:
             rf_band = self.config['band_sel']
-        assert rf_band < len(rf_bands), "Requested RF band is out of range (0-3)"
-        bitmap = 2 ** switch_cnt + ~(1 << (rf_bands[rf_band]))
+        assert rf_band <= len(rf_bands), "Requested RF band is out of range" +\
+            "(1-%i)" % len(rf_bands)
+        bitmap = 2 ** switch_cnt + ~(1 << (rf_bands[rf_band - 1] - 1))
         return rf_band, bitmap
 
     def fe_set(self, rf_band=None, gain=None):
@@ -205,7 +205,9 @@ class spec:
         Alternatively, pass a tuple or list to specify the three values
         explicitly. \n
         If no gain is specified, default to whatever's in the config file \n
+        Attenuators / switches set in sequence to limit self-generated RFI\n
         """
+        self.config['fe_write'] = True  # Flag for front-end ctrl line check
         initial = not(gain)
         switch_cnt = self.config['rf_switch_cnt']  # No. of switch ctrl lines (bits)
         if gain is None:  # set to config_file or existing value
@@ -228,13 +230,13 @@ class spec:
                 bitmap += (int(-atten * 2)) << (int(switch_cnt) + (6 * int(att)))
             if initial:
                 bitmap = 2 ** 24 - 1
-                self.fpga.write_int('rf_ctrl0', bitmap)
+                self.fe_write(bitmap)
                 bitmap_check = bitmap
                 break
             elif bitmap == bitmap_check:
                 continue
             else:
-                self.fpga.write_int('rf_ctrl0', bitmap)
+                self.fe_write(bitmap)
                 bitmap_check = bitmap
         self.cal.update_atten_bandpass(gain=gain)  # updates config['rf_atten']
         rf_band, bitmap_interm =\
@@ -247,12 +249,29 @@ class spec:
             if x > 0:
                 attens[x - 1] = attens_new[x - 1]
             for (att, atten) in enumerate(reversed(attens)):
-                bitmap += ((int(-atten * 2))) << (int(switch_cnt) + (6 * int(att)))
+                bitmap += ((int(-atten * 2))) << (int(switch_cnt) +
+                                                  (6 * int(att)))
             if bitmap == bitmap_check:
                 continue
             else:
-                self.fpga.write_int('rf_ctrl0', bitmap)
+                self.fe_write(bitmap)
                 bitmap_check = bitmap
+
+    def fe_write(self, bitmap, read=True):
+        '''
+        Write bitstream to front-end control board and read back
+        register entries, raising RuntimeError if mismatched.
+        '''
+        self.fpga.write_int('rf_ctrl0', bitmap)
+        if read:
+            time.sleep(0.2)  # shortest safe delay for succesful readback
+            fb_bitmap = self.fpga.read_uint('rf_fb0')
+            if bitmap != fb_bitmap:
+                err_mssge = 'Front-End Control Error:\n%s\twritten bitstream\
+                    \n%s\treturned bitstream' % (bin(bitmap), bin(fb_bitmap))
+                self.logger.error(err_mssge)
+                print err_mssge
+                self.config['fe_write'] = False
 
     def set_valon(self, freq=None):
         '''
@@ -407,11 +426,11 @@ class spec:
         FPGA's clock frequency.
         """
         est_rate = round(self.fpga.est_brd_clk())
-        if est_rate > (self.config['fpga_clk']/1e6 + 1) or\
-                est_rate < (self.config['fpga_clk']/1e6 - 1):
+        if est_rate > (self.config['fpga_clk'] / 1e6 + 1) or\
+                est_rate < (self.config['fpga_clk'] / 1e6 - 1):
             self.logger.error(
                 'FPGA clock rate is %i MHz where we expect it to be %i MHz.'
-                % (est_rate, self.config['fpga_clk']/1e6))
+                % (est_rate, self.config['fpga_clk'] / 1e6))
 
         return est_rate
 
@@ -424,16 +443,16 @@ class spec:
 
         #TODO Implement for RATTY2
         raise RuntimeError('Not yet implmeneted for RATTY2')
-        base_gain = self.rf_atten_set((low+high)/2.)
+        base_gain = self.rf_atten_set((low + high) / 2.)
         time.sleep(0.2)
-        base_power = self.adc_amplitudes_get()['adc_dbm']-base_gain
+        base_power = self.adc_amplitudes_get()['adc_dbm'] - base_gain
         gain_cal = []
         for g in numpy.arange(low,
-                              high+self.config['rf_gain_range'][2],
+                              high + self.config['rf_gain_range'][2],
                               self.config['rf_gain_range'][2]):
             self.rf_atten_set(g)
             time.sleep(0.2)
-            gain_cal.append(self.adc_amplitudes_get()['adc_dbm']-base_power)
+            gain_cal.append(self.adc_amplitudes_get()['adc_dbm'] - base_power)
         return gain_cal
 
     def get_spectrum(self, last_acc_cnt=None):
@@ -458,7 +477,7 @@ class spec:
                 numpy.fromstring(
                     self.fpga.read('%s%i' % (
                         self.config['spectrum_bram_out_prefix'], i),
-                        self.config['n_chans']/self.config['n_par_streams']*8),
+                        self.config['n_chans'] / self.config['n_par_streams'] * 8),
                     dtype=numpy.uint64).byteswap()
 
         self.last_acc_cnt = self.fpga.read_uint('acc_cnt')
@@ -479,7 +498,7 @@ class spec:
         cal_spectrum *= self.config['adc_v_scale_factor']
 
         #cal_spectrum /= self.config['chan_width']
-        cal_spectrum = 10*numpy.log10(cal_spectrum)
+        cal_spectrum = 10 * numpy.log10(cal_spectrum)
         cal_spectrum -= self.config['system_bandpass']
 
         cal_spectrum -= self.config['pfb_scale_factor']
@@ -511,7 +530,7 @@ class spec:
             fft_shift_schedule = self.config['fft_shift']
         self.fpga.write_int('fft_shift', fft_shift_schedule)
         self.config['fft_shift'] = fft_shift_schedule
-        self.config['fft_scale'] = 2**(cal.bitcnt(fft_shift_schedule))
+        self.config['fft_scale'] = 2 ** (cal.bitcnt(fft_shift_schedule))
         self.logger.info("Set FFT shift to %8x (scaling down by %i)." %
                          (fft_shift_schedule, self.config['fft_scale']))
 
@@ -520,7 +539,7 @@ class spec:
         Fetches the current FFT shifting schedule from the hardware.
         """
         self.config['fft_shift'] = self.fpga.read_uint('fft_shift')
-        self.config['fft_scale'] = 2**(cal.bitcnt(self.config['fft_shift']))
+        self.config['fft_scale'] = 2 ** (cal.bitcnt(self.config['fft_shift']))
         return self.config['fft_shift']
 
     def ctrl_get(self):
@@ -548,13 +567,12 @@ class spec:
              \n\t cnt_rst
         """
 
-        key_bit_lookup = {
-            'adc_protect_disable': 13,
-            'flasher_en': 12,
-            'clr_status': 3,
-            'cnt_rst': 1,
-            'mrst': 0,
-            }
+        key_bit_lookup =\
+            {'adc_protect_disable': 13,
+             'flasher_en': 12,
+             'clr_status': 3,
+             'cnt_rst': 1,
+             'mrst': 0, }
 
         value = self.ctrl_get()['raw']
         run_cnt = 0
