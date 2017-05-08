@@ -263,8 +263,8 @@ class cal:
         """
         Extract the RF bandpass calibration from the cal file and
         update global config for the user-specified gain setting.
+        Update Ip1dB level to track compression limit
         """
-
         self.config['rf_atten'] = gain
         self.config['system_bandpass'] = []
         if (self.config['system_bandpass_calfile'] != 'none'):
@@ -276,7 +276,16 @@ class cal:
                 freqs_hz=self.config['freqs'])
         else:
             self.config['system_bandpass'] = numpy.ones(
-                self.config['n_chans'])*self.config['rf_atten']
+                self.config['n_chans']) * self.config['rf_atten']
+        asm = open(cal_files(self.config['rf_ip1db_map']))
+        asmv = csv.DictReader(asm, delimiter=',')
+        for line in asmv:
+            if float(line['attenuation']) == float(gain):
+                rf_ip1db = line['ip1db:limiting_component'].split(':')
+                self.config['rf_ip1db'] = [float(rf_ip1db[0]),
+                                           rf_ip1db[1]]
+                break
+        asm.close()
 
     def _rf_atten_calc(self, gain=None):
         """Determines the attenuation for each of the 3 RF attenuators

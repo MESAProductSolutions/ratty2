@@ -96,9 +96,6 @@ class rattyconf:
         self.config['adc_levels_acc_len'] = 4500000. / 512.
         self.config['adc_type'] = 'mkadc 1800Msps, 10b, single input'
         self.config['pfb_scale_factor'] = 119.9
-        # 143.2 (aug 2015 bof)
-        # (148.2) a scaling co-efficient corresponding to the gain through
-        # the digital filterbank
         self.config['katcp_port'] = 7147
         self.config['roach_ip'] =\
             struct.unpack('>I',
@@ -109,12 +106,13 @@ class rattyconf:
         self.config['roach_ip_str'] = self.get_line(
             'connection',
             'roach_ip')
+        self.config['rta_serial_number'] = self.get_line('connection',
+                                                         'rta_serial_number')
         self.config['rf_switch_layout'] = \
             [int(x) for x in self.get_line('analogue_frontend',
                                            'rf_switch_layout').split(',')]
         self.read_int('analogue_frontend', 'rf_switch_cnt')
         self.config['rf_gain_range'] = [-31.5, 0, 0.5]
-        # self.config['rf_gain_range'] = [-31.0, 0, 1.0]
         self.read_int('analogue_frontend', 'band_sel')
         # self.read_float('analogue_frontend','desired_rf_level')
         self.read_float('analogue_frontend', 'ignore_high_freq')
@@ -127,6 +125,9 @@ class rattyconf:
         self.config['system_bandpass_calfile'] =\
             self.get_line('analogue_frontend',
                           'system_bandpass_calfile')
+        self.config['rf_ip1db_map'] =\
+            self.get_line('analogue_frontend',
+                          'rf_ip1db_map')
         self.read_float('analogue_frontend', 'rf_atten')
 
     def write(self, section, variable, value):
