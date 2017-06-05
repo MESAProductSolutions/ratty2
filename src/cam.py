@@ -187,7 +187,7 @@ class spec:
             rf_band = self.config['band_sel']
         assert rf_band <= len(rf_bands), "Requested RF band is out of range" +\
             "(1-%i)" % len(rf_bands)
-        bitmap = 2 ** switch_cnt + ~(1 << (rf_bands[rf_band]))
+        bitmap = int(self.config['rf_switch_layout'][rf_band])
         return rf_band, bitmap
 
     def fe_set(self, rf_band=None, gain=None):
@@ -209,7 +209,6 @@ class spec:
         """
         self.config['fe_write'] = True  # Flag for front-end ctrl line check
         initial = not(gain)
-        switch_cnt = self.config['rf_switch_cnt']  # No. of switch ctrl lines (bits)
         if gain is None:  # set to config_file or existing value
             gain = self.config['rf_atten']
         gain = round(gain * 2.) / 2.
@@ -221,16 +220,19 @@ class spec:
                                       rf_band=self.config['band_sel'])
         attens = self.cal._rf_atten_calc(float(-94.5))  # max attenuation
         bitmap_check = bitmap_interm
+        switch_bitmap_offset =\
+            int(len(numpy.binary_repr(self.config['rf_switch_layout'][0])))
         for (att, atten) in enumerate(reversed(attens_interm)):
-            bitmap_check += (int(-atten * 2)) << (int(switch_cnt) + (6 * int(att)))
+            bitmap_check += (int(-atten * 2)) <<\
+                (switch_bitmap_offset + (6 * int(att)))
         for x in range(att_l):  # Set attenuation to maximum, back-to-front
             bitmap = bitmap_interm
             attens_interm[-1 - x] = attens[-1 - x]
             for (att, atten) in enumerate(reversed(attens_interm)):
                 bitmap += (int(-atten * 2)) <<\
-                    (int(switch_cnt) + (6 * int(len(attens) - 1 - att)))
+                    (switch_bitmap_offset + (6 * int(len(attens) - 1 - att)))
             if initial:
-                bitmap = 2 ** 24 - 1
+                bitmap = 2 ** 32 - 1
                 self.fe_write(bitmap)
                 bitmap_check = bitmap
                 break
@@ -251,7 +253,7 @@ class spec:
                 attens[x - 1] = attens_new[x - 1]
             for (att, atten) in enumerate(attens):
                 bitmap += ((int(-atten * 2))) <<\
-                    (int(switch_cnt) + (6 * int(len(attens) - 1 - att)))
+                    (switch_bitmap_offset + (6 * int(len(attens) - 1 - att)))
             if bitmap == bitmap_check:
                 continue
             else:
@@ -360,8 +362,8 @@ class spec:
                 print 'ok, %i MHz' % est_rate
 
         if print_progress:
-            print '\tSelecting RF band %i (%i-%i MHz) and adjusting\
-                    attenuators for %4.1fdB total attenuation...' %\
+            print '\tSelecting RF band %i (%i-%i MHz) and...\n\t\
+                adjusting attenuators for %4.1fdB total attenuation...' %\
                 (self.config['band_sel'],
                  self.config['ignore_low_freq'] / 1.e6,
                  self.config['ignore_high_freq'] / 1.e6,

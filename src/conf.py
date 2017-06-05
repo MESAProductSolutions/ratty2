@@ -111,7 +111,6 @@ class rattyconf:
         self.config['rf_switch_layout'] = \
             [int(x) for x in self.get_line('analogue_frontend',
                                            'rf_switch_layout').split(',')]
-        self.read_int('analogue_frontend', 'rf_switch_cnt')
         self.config['rf_gain_range'] = [-31.5, 0, 0.5]
         self.read_int('analogue_frontend', 'band_sel')
         # self.read_float('analogue_frontend','desired_rf_level')
