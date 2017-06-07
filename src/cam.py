@@ -176,7 +176,7 @@ class spec:
 
         return (fft_shift_adj & self.config['fft_shift'])
 
-    def _rf_band_switch_calc(self, switch_cnt, rf_band=None):
+    def _rf_band_switch_calc(self, rf_band=None):
         """
         Calculates the bitmap for the RF switches to select an RF band.
         Select a band between 1 and 4.\n
@@ -216,8 +216,7 @@ class spec:
         attens_interm = self.cal._rf_atten_calc(self.config['rf_atten'])
         att_l = len(attens_interm)
         rf_band, bitmap_interm =\
-            self._rf_band_switch_calc(switch_cnt,
-                                      rf_band=self.config['band_sel'])
+            self._rf_band_switch_calc(rf_band=self.config['band_sel'])
         attens = self.cal._rf_atten_calc(float(-94.5))  # max attenuation
         bitmap_check = bitmap_interm
         switch_bitmap_offset =\
@@ -243,7 +242,7 @@ class spec:
                 bitmap_check = bitmap
         self.cal.update_atten_bandpass(gain=gain)  # updates config['rf_atten']
         rf_band, bitmap_interm =\
-            self._rf_band_switch_calc(switch_cnt, rf_band=rf_band_new)
+            self._rf_band_switch_calc(rf_band=rf_band_new)
         self.logger.info("Selected RF band %i." % rf_band)
         self.config['band_sel'] = rf_band
         attens_new = self.cal._rf_atten_calc(self.config['rf_atten'])
