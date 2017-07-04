@@ -220,7 +220,8 @@ class spec:
         attens = self.cal._rf_atten_calc(float(-94.5))  # max attenuation
         bitmap_check = bitmap_interm
         switch_bitmap_offset =\
-            int(len(numpy.binary_repr(self.config['rf_switch_layout'][0])))
+            numpy.max([int(len(numpy.binary_repr(n)))
+                       for n in self.config['rf_switch_layout']])
         for (att, atten) in enumerate(reversed(attens_interm)):
             bitmap_check += (int(-atten * 2)) <<\
                 (switch_bitmap_offset + (6 * int(att)))
