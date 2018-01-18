@@ -674,13 +674,20 @@ class spec:
             self.fpga.write_int('trig_level', 0)
             circ_capture = False
 
-        return numpy.fromstring(
-            self.fpga.snapshot_get('snap_adc',
-                                   man_valid=True,
-                                   man_trig=True,
-                                   circular_capture=circ_capture,
-                                   wait_period=wait_period)['data'],
-            dtype=numpy.int16).byteswap()
+        try:
+            result = numpy.fromstring(
+                self.fpga.snapshot_get('snap_adc',
+                                       man_valid=True,
+                                       man_trig=True,
+                                       circular_capture=circ_capture,
+                                       wait_period=wait_period)['data'],
+                                       dtype=numpy.int16).byteswap()
+            success = True
+        except:
+            result = None
+            success = False
+        return result, success
+
 
     def adc_temp_get(self):
         """

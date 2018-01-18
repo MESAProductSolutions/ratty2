@@ -247,6 +247,7 @@ class cal:
         for key in kwargs:
             self.config[key] = kwargs[key]
 
+
     def generate_freqs(self, n_chans): 
         start_freq =\
             (self.config['nyquist_zone']-1)*self.config['bandwidth'] +\
