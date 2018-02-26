@@ -256,9 +256,11 @@ class spec:
                     (switch_bitmap_offset + (6 * int(len(attens) - 1 - att)))
             if bitmap == bitmap_check:
                 continue
-            else:
+            else:           
                 self.fe_write(bitmap)
                 bitmap_check = bitmap
+        print bitmap
+
 
     def fe_write(self, bitmap, read=True):
         '''
