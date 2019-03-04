@@ -176,7 +176,7 @@ class spec:
 
         return (fft_shift_adj & self.config['fft_shift'])
 
-    def _rf_band_switch_calc(self, rf_band=None):
+    def _rf_band_switch_calc(self, rf_band=None, cal_config=False):
         """
         Calculates the bitmap for the RF switches to select an RF band.
         Select a band between 1 and 4.\n
@@ -188,18 +188,22 @@ class spec:
         assert rf_band <= len(rf_bands), "Requested RF band is out of range" +\
             "(1-%i)" % len(rf_bands)
         bitmap = int(self.config['rf_switch_layout'][rf_band])
+        if cal_config:
+            bitmap += cal_config
         return rf_band, bitmap
 
-    def fe_set(self, rf_band=None, gain=None):
+    def fe_set(self, rf_band=None, gain=None, cal_config=False):
         """
         Configures the analogue box:
         selects bandpass filters and adjusts RF attenuators;
         updates global config with changes.\n
-        Select a band between 1 and 4: \n
+        Select a band between 1 and 6 (roughly): \n
         \t 1: 0-828 MHz \n
         \t 2: 750-1100 MHz \n
         \t 3: 900-1670 MHz \n
-        \t 4: 1950-2450 MHz \n
+        \t 4: 1560-2050 MHz \n
+        \t 5: 1950-2450 MHz \n
+        \t 6: 2450-2900 MHz \n
         Valid gain range is -94.5 to 0dB;
         If single value, import atten settings from atten_setting_map \n
         Alternatively, pass a tuple or list to specify the three values
@@ -243,7 +247,7 @@ class spec:
                 bitmap_check = bitmap
         self.cal.update_atten_bandpass(gain=gain)  # updates config['rf_atten']
         rf_band, bitmap_interm =\
-            self._rf_band_switch_calc(rf_band=rf_band_new)
+            self._rf_band_switch_calc(rf_band=rf_band_new, cal_config=cal_config)
         self.logger.info("Selected RF band %i." % rf_band)
         self.config['band_sel'] = rf_band
         attens_new = self.cal._rf_atten_calc(self.config['rf_atten'])
@@ -256,9 +260,12 @@ class spec:
                     (switch_bitmap_offset + (6 * int(len(attens) - 1 - att)))
             if bitmap == bitmap_check:
                 continue
-            else:
+            else:           
                 self.fe_write(bitmap)
                 bitmap_check = bitmap
+        print '\nBitmap:\t%i\tBitmap Binary:%s\n'\
+            %(bitmap, numpy.binary_repr(bitmap))
+
 
     def fe_write(self, bitmap, read=True):
         '''
@@ -474,41 +481,29 @@ class spec:
             #Wait until the next accumulation has been performed.
             time.sleep(0.1)
         spectrum = numpy.zeros(self.config['n_chans'])
+        spectrum = read_roach_spectrum()
 
-        for i in range(self.config['n_par_streams']):
-            spectrum[i::self.config['n_par_streams']] =\
-                numpy.fromstring(
-                    self.fpga.read('%s%i' % (
-                        self.config['spectrum_bram_out_prefix'], i),
-                        self.config['n_chans'] / self.config['n_par_streams'] * 8),
-                    dtype=numpy.uint64).byteswap()
+        #for i in range(self.config['n_par_streams']):
+        #    spectrum[i::self.config['n_par_streams']] =\
+        #        numpy.fromstring(
+        #            self.fpga.read('%s%i' % (
+        #                self.config['spectrum_bram_out_prefix'], i),
+        #                self.config['n_chans'] / self.config['n_par_streams'] * 8),
+        #            dtype=numpy.uint64).byteswap()
+        #
+        #self.last_acc_cnt = self.fpga.read_uint('acc_cnt')
+        #if self.config['flip_spectrum']:
+        #    spectrum = spectrum[::-1]
+        #stat = self.status_get()
+        #ampls = self.adc_amplitudes_get()
+        #if stat['adc_shutdown']:
+        #    self.logger.error('ADC selfprotect due to overrange!')
+        #elif stat['adc_overrange']:
+        #    self.logger.warning('ADC is clipping!')
+        #elif stat['fft_overrange']:
+        #    self.logger.error('FFT is overflowing!')
 
-        self.last_acc_cnt = self.fpga.read_uint('acc_cnt')
-        if self.config['flip_spectrum']:
-            spectrum = spectrum[::-1]
-        stat = self.status_get()
-        ampls = self.adc_amplitudes_get()
-        if stat['adc_shutdown']:
-            self.logger.error('ADC selfprotect due to overrange!')
-        elif stat['adc_overrange']:
-            self.logger.warning('ADC is clipping!')
-        elif stat['fft_overrange']:
-            self.logger.error('FFT is overflowing!')
-
-        cal_spectrum = spectrum
-        cal_spectrum /= float(self.config['n_accs'])
-        cal_spectrum *= self.config['fft_scale']
-        cal_spectrum *= self.config['adc_v_scale_factor']
-
-        #cal_spectrum /= self.config['chan_width']
-        cal_spectrum = 10 * numpy.log10(cal_spectrum)
-        cal_spectrum -= self.config['system_bandpass']
-
-        cal_spectrum -= self.config['pfb_scale_factor']
-
-        if self.config['antenna_bandpass_calfile'] != 'none':
-            cal_spectrum = ratty2.cal.dbm_to_dbuv(cal_spectrum)
-            cal_spectrum += self.config['ant_factor']
+        cal_spectrum = r.cal.calibrate_pfb_spectrum(spectrum)
 
         return {'raw_spectrum': spectrum,
                 'calibrated_spectrum': cal_spectrum,
@@ -705,6 +700,123 @@ class spec:
         #Note: KATADC and MKADC use same IIC temp sensors;
         #just leverage that here.
         return corr.katadc.get_ambient_temp(self.fpga, 0)
+
+
+
+
+
+
+
+
+    def read_roach_spectrum(self):
+        spectrum = numpy.zeros(self.config['n_chans'])
+
+        for i in range(self.config['n_par_streams']):
+            spectrum[i::self.config['n_par_streams']] =\
+                numpy.fromstring(
+                    self.fpga.read('%s%i' % (
+                        self.config['spectrum_bram_out_prefix'], i),
+                        self.config['n_chans'] / self.config['n_par_streams'] * 8),
+                    dtype=numpy.uint64).byteswap()
+        self.last_acc_cnt = self.fpga.read_uint('acc_cnt')
+        if self.config['flip_spectrum']:
+            spectrum = spectrum[::-1]
+        stat = self.status_get()
+        ampls = self.adc_amplitudes_get()
+        if stat['adc_shutdown']:
+            self.logger.error('ADC selfprotect due to overrange!')
+        elif stat['adc_overrange']:
+            self.logger.warning('ADC is clipping!')
+        elif stat['fft_overrange']:
+            self.logger.error('FFT is overflowing!')
+        return spectrum
+
+
+
+    def noise_calibration_cam(self, last_acc_cnt=None, verbose=True,
+                          digital_spectrum=False):
+        """
+        Configures front-end for noise-source input, perform calibration
+        measurements (OFF / ON), pass data to cal.py and safe relevant results to file.  
+        """
+        if last_acc_cnt is None:
+            last_acc_cnt = self.last_acc_cnt
+        t1 = time.time()
+        print '\ntime 1, last_acc_cnt ', t1, last_acc_cnt
+        cal_config = self.config['noise_source_on_layout'] +\
+            self.config['input_switch_on_layout']  # ON measurement configuration
+        print "\ncal config:", cal_config
+        self.fe_set(cal_config=cal_config)
+        # rf_band=self.config['band_sel'], gain=self.config['rf_atten'],
+        while self.fpga.read_uint('acc_cnt') <= (last_acc_cnt):
+            #Wait until the next accumulation has been performed.
+            time.sleep(0.1)
+        # self.last_acc_cnt = self.fpga.read_uint('acc_cnt')
+        time.sleep(r.config['acc_period'])
+        hot_spectrum = self.read_roach_spectrum()
+        print '\nhot', time.time(), numpy.mean(hot_spectrum)
+        hot_spectrum = self.cal.calibrate_pfb_spectrum(hot_spectrum, noise_cal=True)
+        cal_config -= self.config['noise_source_on_layout']  # OFF measurement configuration
+        print '\nduration 1, last_acc_cnt ', (time.time()-t1), last_acc_cnt
+        t1 = time.time()
+
+        # print "cal config:", cal_config
+        self.fe_set(cal_config=cal_config)
+        time.sleep(r.config['acc_period'])
+        #  rf_band=self.config['band_sel'], gain=self.config['rf_atten'],
+        #time.sleep(8)
+        while self.fpga.read_uint('acc_cnt') <= (last_acc_cnt):
+            time.sleep(0.1)  # Wait till next accumulation
+        # self.last_acc_cnt = self.fpga.read_uint('acc_cnt')
+
+        cold_spectrum = self.read_roach_spectrum()
+        cold_spectrum = self.cal.calibrate_pfb_spectrum(cold_spectrum, noise_cal=True)
+        print '\nduration 2, last_acc_cnt ', (time.time()-t1), last_acc_cnt
+        print '\ncold (time, mean (dB))', time.time(), numpy.mean(cold_spectrum) 
+        time.sleep(8)
+        if digital_spectrum:        
+            while self.fpga.read_uint('acc_cnt') <= (last_acc_cnt):
+                time.sleep(0.1)  # Wait till next accumulation
+            self.fe_set()
+            digital_spectrum = self.read_roach_spectrum()
+            digital_spectrum = self.cal.calibrate_pfb_spectrum(digital_spectrum, 
+                                                               noise_cal=True)
+            print '\nhot', time.time(), numpy.mean(digital_spectrum)
+        tsys, gain, tsys_mean, gain_mean =\
+            self.cal.noise_calibration_calculation(hot_spectrum, cold_spectrum,
+                                                   digital_spectrum=digital_spectrum)
+        r.fe_set()  # Return to previous hardware state
+        if verbose:   
+            pnt1 = 6666
+            print 'Tsys @ %.2f Hz:\t%2f K' %(self.config['freqs'][pnt1],
+                                             tsys[pnt1])
+            print 'Gain @ %.2f Hz:\t%2f dB' %(self.config['freqs'][pnt1],
+                                              10*numpy.log10(gain[pnt1]))
+            print "Mean Tsys:\t%.2f K" %tsys_mean
+            print "Mean in-band gain:\t%.2f dB " %(10*numpy.log10(gain_mean))
+
+        self.fe_set(rf_band=self.config['band_sel'], gain=self.config['rf_atten'],
+                    cal_config=False)  # return to external rf input
+        self.fe_set()  # TODO Check that fe_set actually writes this
+        return tsys, gain, tsys_mean, gain_mean
+        #return {'raw_spectrum': spectrum,
+        #        'calibrated_spectrum': cal_spectrum,
+        #        'timestamp': time.time(),
+        #        'acc_cnt': self.last_acc_cnt,
+        #        'adc_overrange': stat['adc_overrange'],
+        #        'fft_overrange': stat['fft_overrange'],
+        #        'adc_shutdown': stat['adc_shutdown'],
+        #        'adc_level': ampls['adc_dbm'],
+        #        'input_level': ampls['input_dbm'],
+        #        'adc_temp': self.adc_temp_get(),
+        #        'ambient_temp': self.ambient_temp_get()}
+
+
+
+
+
+
+
 
 
 def ByteToHex(byteStr):

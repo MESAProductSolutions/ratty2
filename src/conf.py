@@ -111,7 +111,12 @@ class rattyconf:
         self.config['rf_switch_layout'] = \
             [int(x) for x in self.get_line('analogue_frontend',
                                            'rf_switch_layout').split(',')]
+        self.read_int('analogue_frontend', 'input_switch_on_layout')
+        self.read_int('analogue_frontend', 'noise_source_on_layout')
         self.config['rf_gain_range'] = [-31.5, 0, 0.5]
+        self.config['noise_source_calfile'] =\
+            self.get_line('analogue_frontend',
+                          'noise_source_calfile')
         self.read_int('analogue_frontend', 'band_sel')
         # self.read_float('analogue_frontend','desired_rf_level')
         self.read_float('analogue_frontend', 'ignore_high_freq')

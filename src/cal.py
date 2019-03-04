@@ -18,6 +18,7 @@ http://www.swharden.com/blog/2008-11-17-linear-data-smoothing-in-python/
 '''
 
 c = 299792458.  # speed of light in m/s
+k = 1.38064852e-23  # Boltzmann constant
 # For when you have everything working and ready to install with distutils
 # cal_file_path = "/etc/rfi_sys/cal_files/"
 
@@ -267,13 +268,15 @@ class cal:
         Update Ip1dB level to track compression limit
         """
         self.config['rf_atten'] = gain
-        self.config['system_bandpass'] = []
+        try:
+            self.config['system_bandpass']
+        except:
+            self.config['system_bandpass'] = []# initiate list
         if (self.config['system_bandpass_calfile'] != 'none'):
             self.config['system_bandpass'] = self.get_interpolated_attens(
                 filename=self.config['system_bandpass_calfile'],
                 #PARALLEL ATTENUATORS
                 atten_db=self.config['rf_atten'],
-                ######
                 freqs_hz=self.config['freqs'])
         else:
             self.config['system_bandpass'] = numpy.ones(
@@ -488,3 +491,108 @@ class cal:
             ret['input_spectrum_dbuv'] = dbm_to_dbuv(ret[
                 'input_spectrum_dbm']) + self.config['antenna_factor']
         return ret
+
+
+
+
+
+
+
+    def find_ignore_freq_bins(self):
+        '''
+        Determine bin numbers for the lower and upper frequency points to ignore 
+        '''
+        x_low = x_high = None
+        for x in range(len(self.config['freqs'])):
+            if float(self.config['freqs'][x]) >\
+                float(self.config['ignore_low_freq']) and\
+                    (x_low is None):
+                x_low = x
+            elif (float(self.config['freqs'][x]) >\
+                float(self.config['ignore_high_freq']) or\
+                (x == (len(self.config['freqs'])-1))) and\
+                x_high is None:
+                x_high = x
+                break
+        return x_low, x_high
+
+    
+    def calibrate_pfb_spectrum(self, spectrum,  noise_cal=False):
+        '''
+        Apply calibration factors to RTA spectrum
+        '''
+        print '\n\n1', spectrum[2010:2020]
+        spectrum /= float(self.config['n_accs'])
+        print '2', spectrum[2010:2020]
+        spectrum *= self.config['fft_scale']
+        print '3', spectrum[2010:2020]
+        spectrum *= self.config['adc_v_scale_factor']
+        print '4', spectrum[2010:2020]
+        spectrum = 10 * numpy.log10(spectrum)
+        print '5', spectrum[2010:2020]
+        spectrum -= self.config['pfb_scale_factor']
+        print '6', spectrum[2010:2020], '\n\n'
+        if not(noise_cal):
+            spectrum -= self.config['system_bandpass']
+            if self.config['antenna_bandpass_calfile'] != 'none':
+                spectrum = ratty2.cal.dbm_to_dbuv(spectrum)
+                spectrum += self.config['ant_factor']
+        return spectrum
+
+
+    def noise_calibration_calculation(self, hot_spectrum, cold_spectrum, 
+                                      digital_spectrum = False, plot=True):
+        '''
+        Calculation of receiver parameters based on noise-source measurements:
+        Y = Non / Noff = hot_spectrum / cold_spectrum
+        Tsys = (Tson + Y*Tsoff) / (Y -1)
+        G = Pon / (k * B * (Tson + Trx))
+        Tson = 10**(NF/10)*T0 + Tamb  # On temp of source
+        '''
+        t0 = 290.  # Reference temperature
+        tamb = 290.  # ambient temperature
+        noise_source_NF =\
+            self.get_interpolated_gains(
+                cal_files(self.config['noise_source_calfile']))
+        tson = 10**(noise_source_NF / 10) * t0 + tamb
+        y_fact = 10**(hot_spectrum / 10) / 10**(cold_spectrum/10)
+        tsys = (tson + y_fact * tamb) / (y_fact - 1)
+        gain = 10**((hot_spectrum - 30) / 10)\
+            / (k * self.config['chan_width'] * (tsys + tson))
+        low_bin, high_bin = self.find_ignore_freq_bins()
+        print 'low bin: %i\thigh_bin:%i' %(low_bin, high_bin)
+        tsys_mean = numpy.mean(tsys[low_bin:high_bin])
+        gain_mean = numpy.mean(gain[low_bin:high_bin])
+        if plot:
+            self.plot_noise_calibration(tsys, gain, low_bin, high_bin,
+                                        cold_spectrum, hot_spectrum,
+                                        digital_spectrum)
+        return tsys, gain, tsys_mean, gain_mean
+
+
+    def plot_noise_calibration(self, tsys, gain, low_bin, high_bin,
+                               cold_spectrum, hot_spectrum, digital_spectrum):
+        """Plots the antenna gain."""
+        import matplotlib.pyplot as plt
+        f, (ax1, ax2, ax3) = plt.subplots(3, 1)
+        plt.title('Noise Calibration Spectra')
+        ax1.plot(self.config['freqs'][low_bin:high_bin]/1.e6,
+                                     tsys[low_bin:high_bin])
+        ax1.set_xlabel('Frequency (MHz)')
+        ax1.set_ylabel('Receiver temperature (K)') 
+        ax2.plot(self.config['freqs'][low_bin:high_bin]/1.e6,
+                                     10*numpy.log10(gain[low_bin:high_bin]))
+        ax2.set_xlabel('Frequency (MHz)')
+        ax2.set_ylabel('Gain (dB)')
+        ax3.plot(self.config['freqs'][low_bin:high_bin]/1.e6,
+                 hot_spectrum[low_bin:high_bin], label='Hot')
+        ax3.plot(self.config['freqs'][low_bin:high_bin]/1.e6,
+                 cold_spectrum[low_bin:high_bin], label='Cold')
+        if type(digital_spectrum) != bool:
+            ax3.plot(self.config['freqs'][low_bin:high_bin]/1.e6,
+                     digital_spectrum[low_bin:high_bin],
+                     label='Digital Noise Floor')
+        ax3.legend()
+        plt.show()
+        plt.waitforbuttonpress()
+        return
