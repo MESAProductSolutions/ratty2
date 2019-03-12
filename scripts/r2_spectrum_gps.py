@@ -64,29 +64,35 @@ def filewrite(stat):
                 #print 'Creating dataset to store %s: '%ky,stat[ky]
                 f.create_dataset(ky,shape=[1],maxshape=[None],data=stat[ky])
     print 'done'
-    print cnt, stat['gps']
+    print cnt, stat['gps'], stat['gps_time']
     return cnt
 
 def getGPS():
-    report = session.next()
     try:
+        session = gps.gps("localhost", "2947")
+        session.stream(gps.WATCH_ENABLE | gps.WATCH_NEWSTYLE) 
+        report = session.next()
         while not 'lat' in report.keys():
-            print "Waiting..."
+            # print "Waiting..."
 	    report = session.next()
         lat = report['lat']
 	lon = report['lon']
+	alt = report['alt']
+	gps_time = report['time'].encode('ascii', 'ignore')
     except KeyboardInterrupt:
         exit_clean()
     except:
         lat = 0.0
         lon = 0.0
-    return lat, lon
+	alt = 0.0
+	gps_time = str(0.0)
+    return [lat, lon, alt], str(gps_time)
 
 
 def getUnpackedData(cnt):
     if play_filename==None:
         stat=r.get_spectrum()
-	stat['gps'] = getGPS()
+	stat['gps'], stat['gps_time'] = getGPS()
         cnt=filewrite(stat)
     else:
         if cnt+1>=f['calibrated_spectrum'].shape[0]: 
@@ -102,7 +108,8 @@ def getUnpackedData(cnt):
                 'acc_cnt':f['acc_cnt'][cnt],
                 'adc_temp':f['adc_temp'][cnt],
                 'ambient_temp':f['ambient_temp'][cnt],
-		'gps':f['gps'][cnt]
+		'gps':f['gps'][cnt],
+		'gps_time': f['gps_time']
                 }
         cnt+=1
         #print stat['calibrated_spectrum']
@@ -137,7 +144,6 @@ def drawDataCallback(cnt):
     calData=stat['calibrated_spectrum']
     
     cnt=stat['file_cnt']
-    print stat['gps']
     subplot1.cla()
     if stat['fft_overrange'] or stat['adc_shutdown'] or stat['adc_overrange']:
         subplot1.set_title('Spectrum %i as at %s (ADC level %5.1fdBm)'%(stat['acc_cnt'],time.ctime(stat['timestamp']),stat['adc_level']),bbox=dict(facecolor='red', alpha=0.5))
@@ -297,7 +303,8 @@ try:
         f['/'].attrs['usrlog']=usrlog
 
         f.create_dataset('calibrated_spectrum',shape=[1,r.config['n_chans']],maxshape=[None,r.config['n_chans']])
-	f.create_dataset('gps', shape=(1,2), maxshape=[None,None])
+	f.create_dataset('gps', shape=[1,3], maxshape=[None,None])
+	f.create_dataset('gps_time', data="", shape=[1,1], maxshape=[None,None])
         for key in r.config.config.keys():
             #print 'Storing',key
             try:
@@ -310,6 +317,7 @@ try:
                     elif type(r.config[key])==dict: 
                         f[key]=r.config[key].items()
 #                        print 'Stored a dict!'
+	print f.keys()
     else:
         print 'Opening file %s...'%play_filename
         f=h5py.File(play_filename,'r')
@@ -319,7 +327,6 @@ try:
                 #print 'trying',key
                 if len(f[key])>1: conf_ovr[key]=f[key][:]
                 else: conf_ovr[key]=f[key]
-	print f['gps']
         co=ratty2.cal.cal(**conf_ovr)
         usrlog=f['/'].attrs['usrlog']
 
