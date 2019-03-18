@@ -287,7 +287,7 @@ class cal:
             if float(line['attenuation']) == float(gain):
                 rf_ip1db = line['ip1db:limiting_component'].split(':')
                 self.config['rf_ip1db'] = [float(rf_ip1db[0]),
-                                           rf_ip1db[1]]
+                        rf_ip1db[1]]
                 break
         asm.close()
 
@@ -541,7 +541,7 @@ class cal:
 
 
     def noise_calibration_calculation(self, hot_spectrum, cold_spectrum, 
-                                      digital_spectrum = False, plot=True):
+                                      digital_spectrum = False, plot_cal=True):
         '''
         Calculation of receiver parameters based on noise-source measurements:
         Y = Non / Noff = hot_spectrum / cold_spectrum
@@ -563,7 +563,7 @@ class cal:
         print 'low bin: %i\thigh_bin:%i' %(low_bin, high_bin)
         tsys_mean = numpy.mean(tsys[low_bin:high_bin])
         gain_mean = numpy.mean(gain[low_bin:high_bin])
-        if plot:
+        if plot_cal:
             self.plot_noise_calibration(tsys, gain, low_bin, high_bin,
                                         cold_spectrum, hot_spectrum,
                                         digital_spectrum)
@@ -571,18 +571,20 @@ class cal:
 
 
     def plot_noise_calibration(self, tsys, gain, low_bin, high_bin,
-                               cold_spectrum, hot_spectrum, digital_spectrum):
-        """Plots the antenna gain."""
-        import matplotlib.pyplot as plt
+                               cold_spectrum, hot_spectrum,
+                               digital_spectrum):
+        """Plot individual cal. measurement results and spectra."""
         f, (ax1, ax2, ax3) = plt.subplots(3, 1)
-        plt.title('Noise Calibration Spectra')
         ax1.plot(self.config['freqs'][low_bin:high_bin]/1.e6,
-                                     tsys[low_bin:high_bin])
+                                        tsys[low_bin:high_bin])
         ax1.set_xlabel('Frequency (MHz)')
-        ax1.set_ylabel('Receiver temperature (K)') 
+        ax1.set_ylabel('Receiver temperature (K)')
+        ax1.plot('Calculated System Temperature')
         ax2.plot(self.config['freqs'][low_bin:high_bin]/1.e6,
-                                     10*numpy.log10(gain[low_bin:high_bin]))
+                 10*numpy.log10(gain[low_bin:high_bin]))
+        ax2.set_ylabel('Gain (dB)')
         ax2.set_xlabel('Frequency (MHz)')
+        ax2.title('Calculated Gain')
         ax2.set_ylabel('Gain (dB)')
         ax3.plot(self.config['freqs'][low_bin:high_bin]/1.e6,
                  hot_spectrum[low_bin:high_bin], label='Hot')
@@ -593,6 +595,6 @@ class cal:
                      digital_spectrum[low_bin:high_bin],
                      label='Digital Noise Floor')
         ax3.legend()
+        plt.title('Noise Calibration Measurement and Calibration')
         plt.show()
-        plt.waitforbuttonpress()
         return

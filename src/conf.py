@@ -132,7 +132,8 @@ class rattyconf:
         self.config['rf_ip1db_map'] =\
             self.get_line('analogue_frontend',
                           'rf_ip1db_map')
-        self.read_float('analogue_frontend', 'rf_atten')
+        self.config['max_atten'] = self.read_float('analogue_frontend',
+                                                   'rf_atten')
 
     def write(self, section, variable, value):
         print 'Writing to the config file. Mostly, this is a bad idea.'

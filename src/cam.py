@@ -197,10 +197,10 @@ class spec:
         Configures the analogue box:
         selects bandpass filters and adjusts RF attenuators;
         updates global config with changes.\n
-        Select a band between 1 and 6 (roughly): \n
-        \t 1: 0-828 MHz \n
-        \t 2: 750-1100 MHz \n
-        \t 3: 900-1670 MHz \n
+        Select a band between 1 and 6 (rough freqs. shown): \n
+        \t 1: 0-750 MHz \n
+        \t 2: 700-1100 MHz \n
+        \t 3: 950-1670 MHz \n
         \t 4: 1560-2050 MHz \n
         \t 5: 1950-2450 MHz \n
         \t 6: 2450-2900 MHz \n
@@ -221,7 +221,7 @@ class spec:
         att_l = len(attens_interm)
         rf_band, bitmap_interm =\
             self._rf_band_switch_calc(rf_band=self.config['band_sel'])
-        attens = self.cal._rf_atten_calc(float(-94.5))  # max attenuation
+        attens = self.cal._rf_atten_calc(self.config['max_atten'])  # max attenuation
         bitmap_check = bitmap_interm
         switch_bitmap_offset =\
             numpy.max([int(len(numpy.binary_repr(n)))
@@ -734,7 +734,7 @@ class spec:
 
 
     def noise_calibration_cam(self, last_acc_cnt=None, verbose=True,
-                          digital_spectrum=False):
+                              digital_spectrum=False, plot_cal=False):
         """
         Configures front-end for noise-source input, perform calibration
         measurements (OFF / ON), pass data to cal.py and safe relevant results to file.  
@@ -745,35 +745,36 @@ class spec:
         print '\ntime 1, last_acc_cnt ', t1, last_acc_cnt
         cal_config = self.config['noise_source_on_layout'] +\
             self.config['input_switch_on_layout']  # ON measurement configuration
-        print "\ncal config:", cal_config
+        print '\ncal_config:\t%i\t(bin: %s)\n' %(cal_config, numpy.binary_repr(cal_config))
         self.fe_set(cal_config=cal_config)
+        time.sleep(1.5 * r.config['acc_period'])
         # rf_band=self.config['band_sel'], gain=self.config['rf_atten'],
         while self.fpga.read_uint('acc_cnt') <= (last_acc_cnt):
             #Wait until the next accumulation has been performed.
             time.sleep(0.1)
         # self.last_acc_cnt = self.fpga.read_uint('acc_cnt')
-        time.sleep(r.config['acc_period'])
         hot_spectrum = self.read_roach_spectrum()
-        print '\nhot', time.time(), numpy.mean(hot_spectrum)
+        print '\nhot', time.time(), numpy.mean(hot_spectrum, noise_cal=True)
         hot_spectrum = self.cal.calibrate_pfb_spectrum(hot_spectrum, noise_cal=True)
         cal_config -= self.config['noise_source_on_layout']  # OFF measurement configuration
+        print '\ncal_config:\t%i\t(bin: %s)\n' %(cal_config, numpy.binary_repr(cal_config))
         print '\nduration 1, last_acc_cnt ', (time.time()-t1), last_acc_cnt
         t1 = time.time()
-
         # print "cal config:", cal_config
         self.fe_set(cal_config=cal_config)
-        time.sleep(r.config['acc_period'])
+        time.sleep(1.5 * r.config['acc_period'])
         #  rf_band=self.config['band_sel'], gain=self.config['rf_atten'],
         #time.sleep(8)
         while self.fpga.read_uint('acc_cnt') <= (last_acc_cnt):
-            time.sleep(0.1)  # Wait till next accumulation
+            time.sleep(0.1)  # Wait till next accumulation TODO check continuous impact
         # self.last_acc_cnt = self.fpga.read_uint('acc_cnt')
-
         cold_spectrum = self.read_roach_spectrum()
-        cold_spectrum = self.cal.calibrate_pfb_spectrum(cold_spectrum, noise_cal=True)
+        cold_spectrum = self.cal.calibrate_pfb_spectrum(cold_spectrum,
+                                                        noise_cal=True,
+                                                        plot_cal=plot_cal)
         print '\nduration 2, last_acc_cnt ', (time.time()-t1), last_acc_cnt
         print '\ncold (time, mean (dB))', time.time(), numpy.mean(cold_spectrum) 
-        time.sleep(8)
+        r.fe_set(gain=r.config['rf_atten_max'], rf_band=r.config['band_sel'])
         if digital_spectrum:        
             while self.fpga.read_uint('acc_cnt') <= (last_acc_cnt):
                 time.sleep(0.1)  # Wait till next accumulation
@@ -784,8 +785,10 @@ class spec:
             print '\nhot', time.time(), numpy.mean(digital_spectrum)
         tsys, gain, tsys_mean, gain_mean =\
             self.cal.noise_calibration_calculation(hot_spectrum, cold_spectrum,
-                                                   digital_spectrum=digital_spectrum)
-        r.fe_set()  # Return to previous hardware state
+                                                   digital_spectrum=digital_spectrum,
+                                                   noise_cal=True)
+        self.fe_set(gain=r.config['rf_atten'], rf_band=r.config['band_sel'])
+        print '\nduration 2, last_acc_cnt ', (time.time()-t1), last_acc_cnt
         if verbose:   
             pnt1 = 6666
             print 'Tsys @ %.2f Hz:\t%2f K' %(self.config['freqs'][pnt1],
@@ -796,27 +799,9 @@ class spec:
             print "Mean in-band gain:\t%.2f dB " %(10*numpy.log10(gain_mean))
 
         self.fe_set(rf_band=self.config['band_sel'], gain=self.config['rf_atten'],
-                    cal_config=False)  # return to external rf input
-        self.fe_set()  # TODO Check that fe_set actually writes this
-        return tsys, gain, tsys_mean, gain_mean
-        #return {'raw_spectrum': spectrum,
-        #        'calibrated_spectrum': cal_spectrum,
-        #        'timestamp': time.time(),
-        #        'acc_cnt': self.last_acc_cnt,
-        #        'adc_overrange': stat['adc_overrange'],
-        #        'fft_overrange': stat['fft_overrange'],
-        #        'adc_shutdown': stat['adc_shutdown'],
-        #        'adc_level': ampls['adc_dbm'],
-        #        'input_level': ampls['input_dbm'],
-        #        'adc_temp': self.adc_temp_get(),
-        #        'ambient_temp': self.ambient_temp_get()}
-
-
-
-
-
-
-
+                    cal_config=False)  # return to external rf input TODO CHECK!
+        return tsys, gain, tsys_mean, gain_mean 
+            #  hot_spectrum, cold_spectrum, digital_spectrum
 
 
 def ByteToHex(byteStr):
