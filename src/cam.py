@@ -481,7 +481,7 @@ class spec:
             #Wait until the next accumulation has been performed.
             time.sleep(0.1)
         spectrum = numpy.zeros(self.config['n_chans'])
-        spectrum = read_roach_spectrum()
+        spectrum = self.read_roach_spectrum()
 
         #for i in range(self.config['n_par_streams']):
         #    spectrum[i::self.config['n_par_streams']] =\
@@ -739,10 +739,12 @@ class spec:
         Configures front-end for noise-source input, perform calibration
         measurements (OFF / ON), pass data to cal.py and safe relevant results to file.  
         """
-        noise_cal_nap = self.config['acc_period'] * 1.5
+        noise_cal_nap = self.config['acc_period'] * 3.
+        print '\nlast acc count:\t' last_acc_cnt
         if last_acc_cnt is None:
             last_acc_cnt = self.last_acc_cnt
         t1 = time.time()
+        print '\nlast acc count:\t' last_acc_cnt
         print '\ntime 1, last_acc_cnt ', t1, last_acc_cnt
         cal_config = self.config['noise_source_on_layout'] +\
             self.config['input_switch_on_layout']  # ON measurement configuration
@@ -753,7 +755,7 @@ class spec:
         while self.fpga.read_uint('acc_cnt') <= (last_acc_cnt):
             #Wait until the next accumulation has been performed.
             time.sleep(0.1)
-        # self.last_acc_cnt = self.fpga.read_uint('acc_cnt')
+        self.last_acc_cnt = self.fpga.read_uint('acc_cnt')
         hot_spectrum = self.read_roach_spectrum()
         print '\nhot', time.time(), numpy.mean(hot_spectrum)
         hot_spectrum = self.cal.calibrate_pfb_spectrum(hot_spectrum, noise_cal=True)
@@ -768,14 +770,15 @@ class spec:
         #time.sleep(8)
         while self.fpga.read_uint('acc_cnt') <= (last_acc_cnt):
             time.sleep(0.1)  # Wait till next accumulation TODO check continuous impact
-        # self.last_acc_cnt = self.fpga.read_uint('acc_cnt')
+        self.last_acc_cnt = self.fpga.read_uint('acc_cnt')
         cold_spectrum = self.read_roach_spectrum()
         cold_spectrum = self.cal.calibrate_pfb_spectrum(cold_spectrum,
                                                         noise_cal=True)
         print '\nduration 2, last_acc_cnt ', (time.time()-t1), last_acc_cnt
         print '\ncold (time, mean (dB))', time.time(), numpy.mean(cold_spectrum) 
         if digital_spectrum:        
-            self.fe_set(gain=self.config['max_atten'], rf_band=self.config['band_sel'])
+            self.fe_set(gain=self.config['max_atten'],
+                        rf_band=self.config['band_sel'])
             time.sleep(noise_cal_nap)
             while self.fpga.read_uint('acc_cnt') <= (last_acc_cnt):
                 time.sleep(0.1)  # Wait till next accumulation

@@ -521,17 +521,11 @@ class cal:
         '''
         Apply calibration factors to RTA spectrum
         '''
-        print '\n\n1', spectrum[2010:2020]
         spectrum /= float(self.config['n_accs'])
-        print '2', spectrum[2010:2020]
         spectrum *= self.config['fft_scale']
-        print '3', spectrum[2010:2020]
         spectrum *= self.config['adc_v_scale_factor']
-        print '4', spectrum[2010:2020]
         spectrum = 10 * numpy.log10(spectrum)
-        print '5', spectrum[2010:2020]
         spectrum -= self.config['pfb_scale_factor']
-        print '6', spectrum[2010:2020], '\n\n'
         if not(noise_cal):
             spectrum -= self.config['system_bandpass']
             if self.config['antenna_bandpass_calfile'] != 'none':
@@ -572,20 +566,20 @@ class cal:
 
     def plot_noise_calibration(self, tsys, gain, low_bin, high_bin,
                                cold_spectrum, hot_spectrum,
-                               digital_spectrum):
+                               digital_spectrum, save_fig=True):
         """Plot individual cal. measurement results and spectra."""
         import matplotlib.pyplot as plt
-        f, (ax1, ax2, ax3) = plt.subplots(3, 1)
+        f, (ax1, ax2, ax3) = plt.subplots(3, 1, figsize=(12, 7))
         ax1.plot(self.config['freqs'][low_bin:high_bin]/1.e6,
                  tsys[low_bin:high_bin])
         ax1.set_xlabel('Frequency (MHz)')
         ax1.set_ylabel('Receiver temperature (K)')
-        plt.title('Calculated System Temperature')
+        #plt.title('Calculated System Temperature')
         ax2.plot(self.config['freqs'][low_bin:high_bin]/1.e6,
                  10*numpy.log10(gain[low_bin:high_bin]))
         ax2.set_ylabel('Gain (dB)')
         ax2.set_xlabel('Frequency (MHz)')
-        plt.title('Calculated Gain')
+        #plt.title('Calculated Gain')
         ax2.set_ylabel('Gain (dB)')
         ax3.plot(self.config['freqs'][low_bin:high_bin]/1.e6,
                  hot_spectrum[low_bin:high_bin], label='Hot')
@@ -595,8 +589,15 @@ class cal:
             ax3.plot(self.config['freqs'][low_bin:high_bin]/1.e6,
                      digital_spectrum[low_bin:high_bin],
                      label='Digital Noise Floor')
+        ax3.set_ylabel('Power Spectrum (dBm)')
+        ax3.set_xlabel('Frequency (MHz)')
         ax3.legend()
-        plt.title('RTA Spectra used in Calibration')
+        f.suptitle('Auto-Calibration\n%.1f dB Attenuation Setting'
+                   % self.config['rf_atten'])
         #plt.title('Noise Calibration Measurement and Calibration')
+        if save_fig:
+            plt.savefig('./plots/' + str(self.config['rf_atten']) +
+                        'dB_atten_Cal_Plots.svg', format="svg",
+                        dpi=600)
         plt.show()
         return
