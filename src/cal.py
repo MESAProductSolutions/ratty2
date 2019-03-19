@@ -541,7 +541,7 @@ class cal:
 
 
     def noise_calibration_calculation(self, hot_spectrum, cold_spectrum, 
-                                      digital_spectrum = False, plot_cal=True):
+                                      digital_spectrum = False, plot_cal=False):
         '''
         Calculation of receiver parameters based on noise-source measurements:
         Y = Non / Noff = hot_spectrum / cold_spectrum
@@ -574,17 +574,18 @@ class cal:
                                cold_spectrum, hot_spectrum,
                                digital_spectrum):
         """Plot individual cal. measurement results and spectra."""
+        import matplotlib.pyplot as plt
         f, (ax1, ax2, ax3) = plt.subplots(3, 1)
         ax1.plot(self.config['freqs'][low_bin:high_bin]/1.e6,
-                                        tsys[low_bin:high_bin])
+                 tsys[low_bin:high_bin])
         ax1.set_xlabel('Frequency (MHz)')
         ax1.set_ylabel('Receiver temperature (K)')
-        ax1.plot('Calculated System Temperature')
+        plt.title('Calculated System Temperature')
         ax2.plot(self.config['freqs'][low_bin:high_bin]/1.e6,
                  10*numpy.log10(gain[low_bin:high_bin]))
         ax2.set_ylabel('Gain (dB)')
         ax2.set_xlabel('Frequency (MHz)')
-        ax2.title('Calculated Gain')
+        plt.title('Calculated Gain')
         ax2.set_ylabel('Gain (dB)')
         ax3.plot(self.config['freqs'][low_bin:high_bin]/1.e6,
                  hot_spectrum[low_bin:high_bin], label='Hot')
@@ -595,6 +596,7 @@ class cal:
                      digital_spectrum[low_bin:high_bin],
                      label='Digital Noise Floor')
         ax3.legend()
-        plt.title('Noise Calibration Measurement and Calibration')
+        plt.title('RTA Spectra used in Calibration')
+        #plt.title('Noise Calibration Measurement and Calibration')
         plt.show()
         return
