@@ -739,16 +739,16 @@ class spec:
         Configures front-end for noise-source input, perform calibration
         measurements (OFF / ON), pass data to cal.py and safe relevant results to file.  
         """
-        noise_cal_nap = self.config['acc_period'] * 3.
-        print '\nlast acc count:\t' last_acc_cnt
+        noise_cal_nap = self.config['acc_period'] * 3.0
+        #print '\nlast acc count:\t', last_acc_cnt
         if last_acc_cnt is None:
             last_acc_cnt = self.last_acc_cnt
         t1 = time.time()
-        print '\nlast acc count:\t' last_acc_cnt
-        print '\ntime 1, last_acc_cnt ', t1, last_acc_cnt
+        #print '\nlast acc count:\t', last_acc_cnt
+        #print '\ntime 1, last_acc_cnt ', t1, last_acc_cnt
         cal_config = self.config['noise_source_on_layout'] +\
             self.config['input_switch_on_layout']  # ON measurement configuration
-        print '\ncal_config:\t%i\t(bin: %s)\n' %(cal_config, numpy.binary_repr(cal_config))
+        #print '\ncal_config:\t%i\t(bin: %s)\n' %(cal_config, numpy.binary_repr(cal_config))
         self.fe_set(cal_config=cal_config)
         time.sleep(noise_cal_nap)
         # rf_band=self.config['band_sel'], gain=self.config['rf_atten'],
@@ -756,12 +756,13 @@ class spec:
             #Wait until the next accumulation has been performed.
             time.sleep(0.1)
         self.last_acc_cnt = self.fpga.read_uint('acc_cnt')
+        print self.last_acc_cnt
         hot_spectrum = self.read_roach_spectrum()
-        print '\nhot', time.time(), numpy.mean(hot_spectrum)
+        #print '\nhot', time.time(), numpy.mean(hot_spectrum)
         hot_spectrum = self.cal.calibrate_pfb_spectrum(hot_spectrum, noise_cal=True)
         cal_config -= self.config['noise_source_on_layout']  # OFF measurement configuration
-        print '\ncal_config:\t%i\t(bin: %s)\n' %(cal_config, numpy.binary_repr(cal_config))
-        print '\nduration 1, last_acc_cnt ', (time.time()-t1), last_acc_cnt
+        #print '\ncal_config:\t%i\t(bin: %s)\n' %(cal_config, numpy.binary_repr(cal_config))
+        #print '\nduration 1, last_acc_cnt ', (time.time()-t1), last_acc_cnt
         t1 = time.time()
         # print "cal config:", cal_config
         self.fe_set(cal_config=cal_config)
@@ -771,11 +772,12 @@ class spec:
         while self.fpga.read_uint('acc_cnt') <= (last_acc_cnt):
             time.sleep(0.1)  # Wait till next accumulation TODO check continuous impact
         self.last_acc_cnt = self.fpga.read_uint('acc_cnt')
+        print self.last_acc_cnt
         cold_spectrum = self.read_roach_spectrum()
         cold_spectrum = self.cal.calibrate_pfb_spectrum(cold_spectrum,
                                                         noise_cal=True)
-        print '\nduration 2, last_acc_cnt ', (time.time()-t1), last_acc_cnt
-        print '\ncold (time, mean (dB))', time.time(), numpy.mean(cold_spectrum) 
+        #print '\nduration 2, last_acc_cnt ', (time.time()-t1), last_acc_cnt
+        #print '\ncold (time, mean (dB))', time.time(), numpy.mean(cold_spectrum) 
         if digital_spectrum:        
             self.fe_set(gain=self.config['max_atten'],
                         rf_band=self.config['band_sel'])
@@ -783,6 +785,8 @@ class spec:
             while self.fpga.read_uint('acc_cnt') <= (last_acc_cnt):
                 time.sleep(0.1)  # Wait till next accumulation
             self.fe_set()
+            self.last_acc_cnt = self.fpga.read_uint('acc_cnt')
+            print self.last_acc_cnt
             digital_spectrum = self.read_roach_spectrum()
             digital_spectrum = self.cal.calibrate_pfb_spectrum(digital_spectrum, 
                                                                noise_cal=True)
@@ -790,7 +794,7 @@ class spec:
         tsys, gain, tsys_mean, gain_mean =\
             self.cal.noise_calibration_calculation(hot_spectrum, cold_spectrum,
                                                    digital_spectrum=digital_spectrum,
-                                                   plot_cal=True)
+                                                   plot_cal=plot_cal)
         self.fe_set(gain=self.config['rf_atten'], rf_band=self.config['band_sel'])
         print '\nduration 2, last_acc_cnt ', (time.time()-t1), last_acc_cnt
         if verbose:   

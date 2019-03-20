@@ -566,7 +566,9 @@ class cal:
 
     def plot_noise_calibration(self, tsys, gain, low_bin, high_bin,
                                cold_spectrum, hot_spectrum,
-                               digital_spectrum, save_fig=True):
+                               digital_spectrum, save_fig=True,
+                               default_file_path=\
+                               '../../RTA_Temp_Archive/Auto_Cal_Temp/plots/'):
         """Plot individual cal. measurement results and spectra."""
         import matplotlib.pyplot as plt
         f, (ax1, ax2, ax3) = plt.subplots(3, 1, figsize=(12, 7))
@@ -596,7 +598,8 @@ class cal:
                    % self.config['rf_atten'])
         #plt.title('Noise Calibration Measurement and Calibration')
         if save_fig:
-            plt.savefig('./plots/' + str(self.config['rf_atten']) +
+            plt.savefig(default_file_path +
+                        str(self.config['rf_atten']).split('.')[0] +
                         'dB_atten_Cal_Plots.svg', format="svg",
                         dpi=600)
         plt.show()
