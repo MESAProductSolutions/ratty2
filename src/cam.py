@@ -212,7 +212,7 @@ class spec:
         Attenuators / switches set in sequence to limit self-generated RFI\n
         """
         self.config['fe_write'] = True  # Flag for front-end ctrl line check
-        initial = not(gain)
+        initial = not(gain)  # TODO Check this is used wisely - maybe just max
         if gain is None:  # set to config_file or existing value
             gain = self.config['rf_atten']
         gain = round(gain * 2.) / 2.
@@ -236,7 +236,7 @@ class spec:
                 bitmap += (int(-atten * 2)) <<\
                     (switch_bitmap_offset + (6 * int(len(attens) - 1 - att)))
             if initial:
-                bitmap = 2 ** 32 - 1
+                bitmap = 2 ** 32 - 1  # write all lines high first round
                 self.fe_write(bitmap)
                 bitmap_check = bitmap
                 break
@@ -263,8 +263,8 @@ class spec:
             else:           
                 self.fe_write(bitmap)
                 bitmap_check = bitmap
-        print '\nBitmap:\t%i\tBitmap Binary:%s\n'\
-            %(bitmap, numpy.binary_repr(bitmap))
+        #print '\nBitmap:\t%i\tBitmap Binary:%s\n'\
+        #    %(bitmap, numpy.binary_repr(bitmap))
 
 
     def fe_write(self, bitmap, read=True):
@@ -734,12 +734,14 @@ class spec:
 
 
     def noise_calibration_cam(self, last_acc_cnt=None, verbose=True,
-                              digital_spectrum=False, plot_cal=False):
+                              digital_spectrum=False, plot_cal=False,
+                              default_file_path='./'):
         """
         Configures front-end for noise-source input, perform calibration
         measurements (OFF / ON), pass data to cal.py and safe relevant results to file.  
         """
-        noise_cal_nap = self.config['acc_period'] * 3.0
+        #print 'rf atten, strt of cam auto cal', self.config['rf_atten']
+        noise_cal_nap = self.config['acc_period'] * 2.2
         #print '\nlast acc count:\t', last_acc_cnt
         if last_acc_cnt is None:
             last_acc_cnt = self.last_acc_cnt
@@ -756,7 +758,7 @@ class spec:
             #Wait until the next accumulation has been performed.
             time.sleep(0.1)
         self.last_acc_cnt = self.fpga.read_uint('acc_cnt')
-        print self.last_acc_cnt
+        print '\n\tself.last_acc_cnt 1) in cam noise cal cam:', self.last_acc_cnt
         hot_spectrum = self.read_roach_spectrum()
         #print '\nhot', time.time(), numpy.mean(hot_spectrum)
         hot_spectrum = self.cal.calibrate_pfb_spectrum(hot_spectrum, noise_cal=True)
@@ -772,39 +774,44 @@ class spec:
         while self.fpga.read_uint('acc_cnt') <= (last_acc_cnt):
             time.sleep(0.1)  # Wait till next accumulation TODO check continuous impact
         self.last_acc_cnt = self.fpga.read_uint('acc_cnt')
-        print self.last_acc_cnt
+        print '\n\tself.last_acc_cnt 2) in cam noise cal cam:', self.last_acc_cnt
         cold_spectrum = self.read_roach_spectrum()
         cold_spectrum = self.cal.calibrate_pfb_spectrum(cold_spectrum,
                                                         noise_cal=True)
         #print '\nduration 2, last_acc_cnt ', (time.time()-t1), last_acc_cnt
         #print '\ncold (time, mean (dB))', time.time(), numpy.mean(cold_spectrum) 
-        if digital_spectrum:        
+        #print 'rf atten, before dig spec', self.config['rf_atten']
+        if digital_spectrum:
+            atten_setting=self.config['rf_atten']
             self.fe_set(gain=self.config['max_atten'],
                         rf_band=self.config['band_sel'])
+            #print 'rf atten,  dig spec', self.config['rf_atten']
             time.sleep(noise_cal_nap)
             while self.fpga.read_uint('acc_cnt') <= (last_acc_cnt):
                 time.sleep(0.1)  # Wait till next accumulation
-            self.fe_set()
             self.last_acc_cnt = self.fpga.read_uint('acc_cnt')
-            print self.last_acc_cnt
+            print '\n\tself.last_acc_cnt 3) in cam noise cal cam:', self.last_acc_cnt
             digital_spectrum = self.read_roach_spectrum()
-            digital_spectrum = self.cal.calibrate_pfb_spectrum(digital_spectrum, 
-                                                               noise_cal=True)
-            print '\nhot', time.time(), numpy.mean(digital_spectrum)
+            digital_spectrum =\
+                self.cal.calibrate_pfb_spectrum(digital_spectrum, noise_cal=True)
+            #print '\nhot', time.time(), numpy.mean(digital_spectrum)
+        #print 'atten setting cam nc', atten_setting
+        self.fe_set(gain=atten_setting)
         tsys, gain, tsys_mean, gain_mean =\
             self.cal.noise_calibration_calculation(hot_spectrum, cold_spectrum,
                                                    digital_spectrum=digital_spectrum,
-                                                   plot_cal=plot_cal)
-        self.fe_set(gain=self.config['rf_atten'], rf_band=self.config['band_sel'])
-        print '\nduration 2, last_acc_cnt ', (time.time()-t1), last_acc_cnt
+                                                   plot_cal=plot_cal,
+                                                   default_file_path=default_file_path)
+        #print '\nduration 2, last_acc_cnt ', (time.time()-t1), last_acc_cnt
+        #print 'rf atten, end of cam auto cal', self.config['rf_atten']
         if verbose:   
             pnt1 = 6666
-            print 'Tsys @ %.2f Hz:\t%2f K' %(self.config['freqs'][pnt1],
+            print '\n\nTsys @ %.2f Hz:\t%2f K' %(self.config['freqs'][pnt1],
                                              tsys[pnt1])
             print 'Gain @ %.2f Hz:\t%2f dB' %(self.config['freqs'][pnt1],
                                               10*numpy.log10(gain[pnt1]))
             print "Mean Tsys:\t%.2f K" %tsys_mean
-            print "Mean in-band gain:\t%.2f dB " %(10*numpy.log10(gain_mean))
+            print "Mean in-band gain:\t%.2f dB\n\n" %(10*numpy.log10(gain_mean))
 
         self.fe_set(rf_band=self.config['band_sel'], gain=self.config['rf_atten'],
                     cal_config=False)  # return to external rf input TODO CHECK!
