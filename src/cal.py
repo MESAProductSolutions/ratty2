@@ -549,60 +549,87 @@ class cal:
         noise_source_NF =\
             self.get_interpolated_gains(
                 cal_files(self.config['noise_source_calfile']))
-        tson = 10**(noise_source_NF / 10) * t0 + tamb
-        y_fact = 10**(hot_spectrum / 10) / 10**(cold_spectrum/10)
-        tsys = (tson + y_fact * tamb) / (y_fact - 1)
-        gain = 10**((hot_spectrum - 30) / 10)\
-            / (k * self.config['chan_width'] * (tsys + tson))
+        tson = 10.**(noise_source_NF / 10.) * t0 + tamb  # Checked 
+        y_fact = 10.**(hot_spectrum / 10.) / 10.**(cold_spectrum/10.)
+        tsys = (tson - y_fact * tamb) / (y_fact - 1.)  # checked
+        ton = 10**((hot_spectrum - self.config['system_bandpass']
+                    - 30.) / 10.)\
+            / (k * self.config['chan_width'])           
+        toff = 10**((cold_spectrum - self.config['system_bandpass']
+                    - 30.) / 10.)\
+            / (k * self.config['chan_width'])
+        y_fact_check = ton / toff  # alternative calculation as check
+        gain = 10.**((hot_spectrum - 30.) / 10.)\
+            / (k * self.config['chan_width'] * (tsys + tson))  # checked
         low_bin, high_bin = self.find_ignore_freq_bins()
-        print 'low bin: %i\thigh_bin:%i' %(low_bin, high_bin)
+        diff_spectrum = hot_spectrum - cold_spectrum
+        mean_diff = numpy.mean(diff_spectrum[low_bin:high_bin])
         tsys_mean = numpy.mean(tsys[low_bin:high_bin])
         gain_mean = numpy.mean(gain[low_bin:high_bin])
         if plot_cal:
             self.plot_noise_calibration(tsys, gain, low_bin, high_bin,
                                         cold_spectrum, hot_spectrum,
-                                        digital_spectrum,
+                                        digital_spectrum, mean_diff,
                                         default_file_path=default_file_path)
         return tsys, gain, tsys_mean, gain_mean
 
 
     def plot_noise_calibration(self, tsys, gain, low_bin, high_bin,
                                cold_spectrum, hot_spectrum,
-                               digital_spectrum, save_fig=True,
-                               default_file_path='./'):
+                               digital_spectrum, mean_diff, save_fig=True,
+                               default_file_path='./', diff=True):
         """Plot individual cal. measurement results and spectra."""
         import matplotlib.pyplot as plt
-        f, (ax1, ax2, ax3) = plt.subplots(3, 1, figsize=(12, 7))
+        if not(diff):
+            f, (ax1, ax2, ax3) = plt.subplots(3, 1, figsize=(12, 12))
+        else:
+            f, (ax1, ax2, ax3, ax4) = plt.subplots(4, 1, figsize=(12, 12))
         ax1.plot(self.config['freqs'][low_bin:high_bin]/1.e6,
                  tsys[low_bin:high_bin])
         ax1.set_xlabel('Frequency (MHz)')
         ax1.set_ylabel('Receiver temperature (K)')
-        #plt.title('Calculated System Temperature')
         ax2.plot(self.config['freqs'][low_bin:high_bin]/1.e6,
                  10*numpy.log10(gain[low_bin:high_bin]))
         ax2.set_ylabel('Gain (dB)')
         ax2.set_xlabel('Frequency (MHz)')
-        #plt.title('Calculated Gain')
         ax2.set_ylabel('Gain (dB)')
         ax3.plot(self.config['freqs'][low_bin:high_bin]/1.e6,
                  hot_spectrum[low_bin:high_bin], label='Hot')
         ax3.plot(self.config['freqs'][low_bin:high_bin]/1.e6,
                  cold_spectrum[low_bin:high_bin], label='Cold')
+        dig_title_string = ''  # string to add to title
         if type(digital_spectrum) != bool:
             ax3.plot(self.config['freqs'][low_bin:high_bin]/1.e6,
                      digital_spectrum[low_bin:high_bin],
                      label='Digital Noise Floor')
+            mean_dig_cold_diff = numpy.mean(cold_spectrum[low_bin:high_bin] -
+                                            digital_spectrum[low_bin:high_bin])
+            dig_title_string += '%.2fdB mean Cold-Digital Diff'\
+                % mean_dig_cold_diff
+        else:
+            dig_title_string = ''
         ax3.set_ylabel('Power Spectrum (dBm)')
         ax3.set_xlabel('Frequency (MHz)')
         ax3.legend()
+        if diff:
+            ax4.plot
+            ax4.plot(self.config['freqs'][low_bin:high_bin]/1.e6,
+                     hot_spectrum[low_bin:high_bin] - 
+                     cold_spectrum[low_bin:high_bin],
+                     label='Hot-Cold Difference')
+            ax4.set_ylabel('Hot-Cold Difference (dB)')
+            ax4.set_xlabel('Frequency (MHz)')
+            ax4.legend()
+
         f.suptitle('Auto-Calibration Spectra and Results\n\n' +\
-                   '%.1f dB Attenuation Setting  '\
-                   % self.config['rf_atten'] + ' (%.1fs Acc. period)'\
-                   % self.config['acc_period'])
-        #plt.title('Noise Calibration Measurement and Calibration')
+                   'Band %i, %.1f dB Attenuation Setting\n'\
+                   % (self.config['band_sel']+1, self.config['rf_atten']) +\
+                   ' (%.2fs Acc. period  ||  %.2fdB mean Hot-Cold Diff.  ||  '\
+                   % (self.config['acc_period'], mean_diff) +\
+                   dig_title_string + ')')
         if save_fig:
-            plt.savefig(default_file_path +
-                        str(self.config['rf_atten']).split('.')[0] +
+            plt.savefig(default_file_path + 'band' + str(self.config['band_sel'] + 1) +
+                        '_min' + str(numpy.abs(self.config['rf_atten'])).split('.')[0] +
                         'dB_atten_auto_cal_spectra_and_results.png',
                         format="png", dpi=600)
         #plt.show()
