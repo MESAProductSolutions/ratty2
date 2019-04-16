@@ -18,6 +18,7 @@ http://www.swharden.com/blog/2008-11-17-linear-data-smoothing-in-python/
 '''
 
 c = 299792458.  # speed of light in m/s
+k = 1.38064852e-23  # Boltzmann constant
 # For when you have everything working and ready to install with distutils
 # cal_file_path = "/etc/rfi_sys/cal_files/"
 
@@ -216,7 +217,7 @@ class cal:
             self.config['flip_spectrum'] = True
             self.chan_offset = self.config['bandwidth']/self.config['n_chans']
 
-        # self.start_freq =\
+        # self.start_freq =\  # TODO Remove this chunk?
         #     (self.config['nyquist_zone']-1)*self.config['bandwidth'] +\
         #     chan_offset
         # self.stop_freq =\
@@ -241,7 +242,8 @@ class cal:
             af_from_gain(self.config['freqs'], self.config['antenna_bandpass'])
         self.config['fft_scale'] = bitcnt(self.config['fft_shift'])
 
-        self.update_atten_bandpass(gain=self.config['rf_atten'])
+        #self.update_atten_bandpass(gain=self.config['rf_atten'])
+        #  Also performed as part of cam init routine 
 
         #Override any defaults:
         for key in kwargs:
@@ -267,13 +269,15 @@ class cal:
         Update Ip1dB level to track compression limit
         """
         self.config['rf_atten'] = gain
-        self.config['system_bandpass'] = []
+        try:
+            self.config['system_bandpass']
+        except:
+            self.config['system_bandpass'] = []# initiate list
         if (self.config['system_bandpass_calfile'] != 'none'):
             self.config['system_bandpass'] = self.get_interpolated_attens(
                 filename=self.config['system_bandpass_calfile'],
                 #PARALLEL ATTENUATORS
                 atten_db=self.config['rf_atten'],
-                ######
                 freqs_hz=self.config['freqs'])
         else:
             self.config['system_bandpass'] = numpy.ones(
@@ -284,20 +288,18 @@ class cal:
             if float(line['attenuation']) == float(gain):
                 rf_ip1db = line['ip1db:limiting_component'].split(':')
                 self.config['rf_ip1db'] = [float(rf_ip1db[0]),
-                                           rf_ip1db[1]]
+                        rf_ip1db[1]]
                 break
-        asm.close()
 
     def _rf_atten_calc(self, gain=None):
         """Determines the attenuation for each of the 3 RF attenuators
            in the RF box. \n
-        \t Valid gain reange is -94.5 to 0dB; If single gain value spec'd,
-           settings read from atten_setting_map\n
+        \t Valid gain reange is config['max_atten'] to 0dB;
+           Single gain value settings read from atten_setting_map\n
         \t Alternatively, pass a tuple or list to specify the three values
            explicitly. \n
         \t If no gain is specified, default to whatever's in the config
            file \n"""
-
         if type(gain) == list or\
                 type(gain) == numpy.ndarray or\
                 type(gain) == tuple:
@@ -308,7 +310,6 @@ class cal:
             asm = open(cal_files(self.config['atten_setting_map']))
             asmv = csv.DictReader(asm, delimiter=',')
             gain = round(gain*2)/2
-
             for line in asmv:
                 if float(line['Attenuation']) == float(gain):
                     rf_attens_temp =\
@@ -318,26 +319,28 @@ class cal:
                                  float(rf_attens_temp[2])]
                     break
             asm.close()
-
         elif gain is None:
-            if self.config.has_key('rf_atten'):
-                rf_attens = [self.config['rf_atten']/3. for att in range(3)]
-            elif self.config.has_key('rf_attens'):
-                rf_attens = self.config['rf_attens']
+            if self.config.has_key('max_atten'):  # Set to max attenuation
+                rf_attens = [self.config['max_atten']/3. for att in range(3)]
+            #if self.config.has_key('rf_atten'):  # else set to previous setting
+            #    rf_attens = [self.config['rf_atten']/3. for att in range(3)]
+            #elif self.config.has_key('rf_attens'):
+            #    rf_attens = self.config['rf_attens']
             else:
                 raise RuntimeError(
                     'Unable to figure out your config file\'s frontend gains;')
         else:
             raise RuntimeError(
                 'Unable to figure out your requested attenuation;')
-
         assert len(rf_attens) == 3, 'Incorect number of gains specified.\
-                                        Please input a list/tuple of 3 numbers'
+            Please input a list/tuple of values equal to the no. of attens'
         for att in range(3):
             assert (-31.5 <= rf_attens[att] <= 0),\
-                "Range for attenuator %i (%3.1f) out of range (-31.0 to 0)." %\
+                "Range for attenuator %i (%3.1f) out of range (-31.5 to 0)." %\
                 (att, rf_attens[att])
-
+        assert sum(rf_attens) >= self.config['max_atten'], '\nRequested' +\
+            'attenuation out of range.\nLimit attenuation to max:\t' +\
+            str(self.config['max_atten']) + ' dB'
         #PARALLEL ATTENUATORS ONLY STEP IN 1dB STEPS - NEED TO ROUND 1dB
         return [round(att*2)/2 for att in rf_attens]
 
@@ -488,3 +491,120 @@ class cal:
             ret['input_spectrum_dbuv'] = dbm_to_dbuv(ret[
                 'input_spectrum_dbm']) + self.config['antenna_factor']
         return ret
+
+
+
+
+
+
+
+    def find_ignore_freq_bins(self):
+        '''
+        Determine bin numbers for the lower and upper frequency points to ignore 
+        '''
+        x_low = x_high = None
+        for x in range(len(self.config['freqs'])):
+            if float(self.config['freqs'][x]) >\
+                float(self.config['ignore_low_freq']) and\
+                    (x_low is None):
+                x_low = x
+            elif (float(self.config['freqs'][x]) >\
+                float(self.config['ignore_high_freq']) or\
+                (x == (len(self.config['freqs'])-1))) and\
+                x_high is None:
+                x_high = x
+                break
+        return x_low, x_high
+
+    
+    def calibrate_pfb_spectrum(self, spectrum,  noise_cal=False):
+        '''
+        Apply calibration factors to RTA spectrum
+        '''
+        spectrum /= float(self.config['n_accs'])
+        spectrum *= self.config['fft_scale']
+        spectrum *= self.config['adc_v_scale_factor']
+        spectrum = 10 * numpy.log10(spectrum)
+        spectrum -= self.config['pfb_scale_factor']
+        if not(noise_cal):
+            spectrum -= self.config['system_bandpass']
+            if self.config['antenna_bandpass_calfile'] != 'none':
+                spectrum = ratty2.cal.dbm_to_dbuv(spectrum)
+                spectrum += self.config['ant_factor']
+        return spectrum
+
+
+    def noise_calibration_calculation(self, hot_spectrum, cold_spectrum, 
+                                      digital_spectrum = False, plot_cal=False,
+                                      default_file_path='./'):
+        '''
+        Calculation of receiver parameters based on noise-source measurements:
+        Y = Non / Noff = hot_spectrum / cold_spectrum
+        Tsys = (Tson + Y*Tsoff) / (Y -1)
+        G = Pon / (k * B * (Tson + Trx))
+        Tson = 10**(NF/10)*T0 + Tamb  # On temp of source
+        '''
+        t0 = 290.  # Reference temperature
+        tamb = 290.  # ambient temperature
+        noise_source_NF =\
+            self.get_interpolated_gains(
+                cal_files(self.config['noise_source_calfile']))
+        tson = 10**(noise_source_NF / 10) * t0 + tamb
+        y_fact = 10**(hot_spectrum / 10) / 10**(cold_spectrum/10)
+        tsys = (tson + y_fact * tamb) / (y_fact - 1)
+        gain = 10**((hot_spectrum - 30) / 10)\
+            / (k * self.config['chan_width'] * (tsys + tson))
+        low_bin, high_bin = self.find_ignore_freq_bins()
+        print 'low bin: %i\thigh_bin:%i' %(low_bin, high_bin)
+        tsys_mean = numpy.mean(tsys[low_bin:high_bin])
+        gain_mean = numpy.mean(gain[low_bin:high_bin])
+        if plot_cal:
+            self.plot_noise_calibration(tsys, gain, low_bin, high_bin,
+                                        cold_spectrum, hot_spectrum,
+                                        digital_spectrum,
+                                        default_file_path=default_file_path)
+        return tsys, gain, tsys_mean, gain_mean
+
+
+    def plot_noise_calibration(self, tsys, gain, low_bin, high_bin,
+                               cold_spectrum, hot_spectrum,
+                               digital_spectrum, save_fig=True,
+                               default_file_path='./'):
+        """Plot individual cal. measurement results and spectra."""
+        import matplotlib.pyplot as plt
+        f, (ax1, ax2, ax3) = plt.subplots(3, 1, figsize=(12, 7))
+        ax1.plot(self.config['freqs'][low_bin:high_bin]/1.e6,
+                 tsys[low_bin:high_bin])
+        ax1.set_xlabel('Frequency (MHz)')
+        ax1.set_ylabel('Receiver temperature (K)')
+        #plt.title('Calculated System Temperature')
+        ax2.plot(self.config['freqs'][low_bin:high_bin]/1.e6,
+                 10*numpy.log10(gain[low_bin:high_bin]))
+        ax2.set_ylabel('Gain (dB)')
+        ax2.set_xlabel('Frequency (MHz)')
+        #plt.title('Calculated Gain')
+        ax2.set_ylabel('Gain (dB)')
+        ax3.plot(self.config['freqs'][low_bin:high_bin]/1.e6,
+                 hot_spectrum[low_bin:high_bin], label='Hot')
+        ax3.plot(self.config['freqs'][low_bin:high_bin]/1.e6,
+                 cold_spectrum[low_bin:high_bin], label='Cold')
+        if type(digital_spectrum) != bool:
+            ax3.plot(self.config['freqs'][low_bin:high_bin]/1.e6,
+                     digital_spectrum[low_bin:high_bin],
+                     label='Digital Noise Floor')
+        ax3.set_ylabel('Power Spectrum (dBm)')
+        ax3.set_xlabel('Frequency (MHz)')
+        ax3.legend()
+        f.suptitle('Auto-Calibration Spectra and Results\n\n' +\
+                   '%.1f dB Attenuation Setting  '\
+                   % self.config['rf_atten'] + ' (%.1fs Acc. period)'\
+                   % self.config['acc_period'])
+        #plt.title('Noise Calibration Measurement and Calibration')
+        if save_fig:
+            plt.savefig(default_file_path +
+                        str(self.config['rf_atten']).split('.')[0] +
+                        'dB_atten_auto_cal_spectra_and_results.png',
+                        format="png", dpi=600)
+        #plt.show()
+        plt.close()
+        return
