@@ -131,13 +131,9 @@ class rattyconf:
                           'system_bandpass_calfile')
         self.config['rf_ip1db_map'] =\
             self.get_line('analogue_frontend',
-<<<<<<< HEAD
                           'rf_ip1db_map')
 	self.config['gps'] = [0, 0, 0]
 	self.config['gps_time'] = ""
-=======
-                          'rf_ip1db_map') 
->>>>>>> 35cb8b7b4973fb5b0e2af5d5be673f686f983d1e
         self.read_float('analogue_frontend', 'rf_atten')
         self.config['max_atten'] = self.config['rf_atten']
 

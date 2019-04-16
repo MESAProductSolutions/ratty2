@@ -63,11 +63,10 @@ class GPSPoller(threading.Thread):
 		if self.stopped(): 
 	            return
                 self.current_gps_value = self.session.next()
-                while not 'lat' in self.current_gps_value.keys():
-                    print "Attempting to lock GPS..."
-                    self.current_gps_value = self.session.next()
-                    print "ok!"
-
+                # while not 'lat' in self.current_gps_value.keys():
+                #     print "Attempting to lock GPS..."
+                #     self.current_gps_value = self.session.next()
+                #     print "ok!"
         except StopIteration:
             pass
 
@@ -121,11 +120,11 @@ def getGPS():
 
     except KeyboardInterrupt:
         exit_clean()
-    # except:
-    #     lat = 0.0
-    #     lon = 0.0
-    #     alt = 0.0
-    #     gps_time = str(0.0)
+    except:
+        lat = 0.0
+        lon = 0.0
+        alt = 0.0
+        gps_time = str(0.0)
     return [lat, lon, alt], str(gps_time)
 
 
@@ -143,7 +142,6 @@ def getUnpackedData(cnt):
     print ''
     stat['file_cnt']=cnt
     return stat
-
 
 
 
