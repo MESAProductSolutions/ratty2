@@ -327,6 +327,7 @@ try:
                 #print 'trying',key
                 if len(f[key])>1: conf_ovr[key]=f[key][:]
                 else: conf_ovr[key]=f[key]
+
         co=ratty2.cal.cal(**conf_ovr)
         usrlog=f['/'].attrs['usrlog']
 
