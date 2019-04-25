@@ -204,7 +204,7 @@ class spec:
         \t 4: 1560-2050 MHz \n
         \t 5: 1950-2450 MHz \n
         \t 6: 2450-2900 MHz \n
-        Valid gain range is -94.5 to 0dB;
+        Valid gain range is max-atten (config file) to 0 dB;
         If single value, import atten settings from atten_setting_map \n
         Alternatively, pass a tuple or list to specify the three values
         explicitly. \n
@@ -214,7 +214,7 @@ class spec:
         self.config['fe_write'] = True  # Flag for front-end ctrl line check
         initial = not(gain)  # TODO Check this is used wisely - maybe just max
         if gain is None:  # set to config_file or existing value
-            gain = self.config['rf_atten']
+            gain = self.config['max_atten']
         gain = round(gain * 2.) / 2.
         rf_band_new = rf_band  # record new variables and keep existing config
         attens_interm = self.cal._rf_atten_calc(self.config['rf_atten'])
@@ -368,7 +368,7 @@ class spec:
             if print_progress:
                 print 'ok, %i MHz' % est_rate
 
-        if print_progress:
+        if print_progress: 
             print '\tSelecting RF band %i (%i-%i MHz) and...\n\t\
                 adjusting attenuators for %4.1fdB total attenuation...' %\
                 (self.config['band_sel'],

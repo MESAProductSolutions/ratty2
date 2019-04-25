@@ -590,9 +590,11 @@ class cal:
         ax1.set_ylabel('Receiver temperature (K)')
         ax2.plot(self.config['freqs'][low_bin:high_bin]/1.e6,
                  10*numpy.log10(gain[low_bin:high_bin]))
+        ax1.grid()
         ax2.set_ylabel('Gain (dB)')
         ax2.set_xlabel('Frequency (MHz)')
         ax2.set_ylabel('Gain (dB)')
+        ax2.grid()
         ax3.plot(self.config['freqs'][low_bin:high_bin]/1.e6,
                  hot_spectrum[low_bin:high_bin], label='Hot')
         ax3.plot(self.config['freqs'][low_bin:high_bin]/1.e6,
@@ -611,6 +613,7 @@ class cal:
         ax3.set_ylabel('Power Spectrum (dBm)')
         ax3.set_xlabel('Frequency (MHz)')
         ax3.legend()
+        ax3.grid()
         if diff:
             ax4.plot
             ax4.plot(self.config['freqs'][low_bin:high_bin]/1.e6,
@@ -620,6 +623,7 @@ class cal:
             ax4.set_ylabel('Hot-Cold Difference (dB)')
             ax4.set_xlabel('Frequency (MHz)')
             ax4.legend()
+            ax4.grid()
 
         f.suptitle('Auto-Calibration Spectra and Results\n\n' +\
                    'Band %i, %.1f dB Attenuation Setting\n'\
