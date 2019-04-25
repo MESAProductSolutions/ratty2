@@ -49,8 +49,8 @@ def exit_clean():
         pass
     exit()
 
-def filewrite(stat):
-    cnt=f['calibrated_spectrum'].shape[0]
+def filewrite(stat, cnt):
+    # cnt=f['calibrated_spectrum'].shape[0]
     print '\nStoring entry %i...'%(cnt-1),
     sys.stdout.flush()
     #return #skip for now!
@@ -91,9 +91,11 @@ def getGPS():
 
 def getUnpackedData(cnt):
     if play_filename==None:
-        stat=r.get_spectrum()
+        # stat=r.get_spectrum()
+	stat = {}
 	stat['gps'], stat['gps_time'] = getGPS()
-        cnt=filewrite(stat)
+	# cnt += 1
+        tmp=filewrite(stat, cnt)
     else:
         if cnt+1>=f['calibrated_spectrum'].shape[0]: 
             print 'No more data; end of file... bye!'
@@ -114,12 +116,12 @@ def getUnpackedData(cnt):
         cnt+=1
         #print stat['calibrated_spectrum']
 
-    print '[%i] %s: input level: %5.2f dBm (ADC %5.2f dBm), %f degC.'%(stat['acc_cnt'],time.ctime(stat['timestamp']),stat['input_level'],stat['adc_level'],stat['adc_temp']),
-    if stat['adc_shutdown']: print 'ADC selfprotect due to overrange!',
-    elif stat['adc_overrange']: print 'ADC is clipping!',
-    elif stat['fft_overrange']: print 'FFT is overflowing!',
-    else: print 'all ok.',
-    print ''
+    # print '[%i] %s: input level: %5.2f dBm (ADC %5.2f dBm), %f degC.'%(stat['acc_cnt'],time.ctime(stat['timestamp']),stat['input_level'],stat['adc_level'],stat['adc_temp']),
+    # if stat['adc_shutdown']: print 'ADC selfprotect due to overrange!',
+    # elif stat['adc_overrange']: print 'ADC is clipping!',
+    # elif stat['fft_overrange']: print 'FFT is overflowing!',
+    # else: print 'all ok.',
+    # print ''
     stat['file_cnt']=cnt
     return stat
 
@@ -141,7 +143,7 @@ def find_n_max(data,n_max,ignore_adjacents=False):
 # callback function to draw the data for all the required polarisations
 def drawDataCallback(cnt):
     stat = getUnpackedData(cnt, None, None)
-    calData=stat['calibrated_spectrum']
+    # calData=stat['calibrated_spectrum']
     
     cnt=stat['file_cnt']
     subplot1.cla()
@@ -223,8 +225,8 @@ def drawDataCallback(cnt):
         print '\nPress enter to grab dataset number %i...'%cnt,
         raw_input()
 
-    if opts.update:
-        fig.canvas.manager.window.after(100, drawDataCallback, cnt)
+    # if opts.update:
+    #     fig.canvas.manager.window.after(100, drawDataCallback, cnt)
 
 def parseargs(args):
     ret={}
@@ -286,7 +288,7 @@ try:
         co=r.cal
         print 'Config file %s parsed ok!'%(r.config['config_file'])
         print 'Connecting to ROACH %s...'%r.config['roach_ip_str'],
-        r.connect()
+        # r.connect()
 
         if verbose:
             r.logger.setLevel(logging.DEBUG)
@@ -294,7 +296,7 @@ try:
             r.logger.setLevel(logging.INFO)
         print 'done.'
 
-        r.initialise(skip_program=(not opts.fpga_prog), print_progress=True)
+        # r.initialise(skip_program=(not opts.fpga_prog), print_progress=True)
         #r.rf_frontend.stop() #disconnect from the RF interface, in case other instances want to take control while we're running.
 
         usrlog=('Starting file at %s (%i).'%(time.ctime(),int(time.time())))
@@ -327,7 +329,6 @@ try:
                 #print 'trying',key
                 if len(f[key])>1: conf_ovr[key]=f[key][:]
                 else: conf_ovr[key]=f[key]
-
         co=ratty2.cal.cal(**conf_ovr)
         usrlog=f['/'].attrs['usrlog']
 
@@ -359,13 +360,15 @@ try:
             subplot1 = fig.add_subplot(2, 1, 1)
             subplot2 = fig.add_subplot(2, 1, 2)
         else: subplot1 = fig.add_subplot(1, 1, 1)
-        fig.canvas.manager.window.after(100, drawDataCallback,cnt)
-        matplotlib.pyplot.show()
-        print 'Plot started.'
+        # fig.canvas.manager.window.after(100, drawDataCallback,cnt)
+        # matplotlib.pyplot.show()
+        # print 'Plot started.'
     else:
     	while(1):
             try:
-                calData=getUnpackedData(cnt)['calibrated_spectrum']
+		calData = getUnpackedData(cnt)
+		cnt += 1
+                # calData=getUnpackedData(cnt)['calibrated_spectrum']
                 # maxs,locs=find_n_max(calData[chan_low:chan_high],n_top,ignore_adjacents=True)
                 # maxfreqs=[freqs[locs[i]+chan_low]/1.e6 for i in range(n_top)]
                 # for i in range(n_top):

@@ -263,8 +263,7 @@ class spec:
             else:           
                 self.fe_write(bitmap)
                 bitmap_check = bitmap
-        #print '\nBitmap:\t%i\tBitmap Binary:%s\n'\
-        #    %(bitmap, numpy.binary_repr(bitmap))
+        print bitmap
 
 
     def fe_write(self, bitmap, read=True):
