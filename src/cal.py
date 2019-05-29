@@ -390,7 +390,7 @@ class cal:
                 for pair in raw_line['freq_hz:measured_gain_db'].split(';'):
                     freq, gain = pair.split(':')
                     freqs.append(float(freq))
-                    gains.append(float(gain)) 
+                    gains.append(float(gain))
         if not(freqs[0] <= freqs_hz[0]):
             freqs.insert(0, 0.0)
             gains.insert(0, gains[0])

@@ -251,6 +251,7 @@ class spec:
         self.logger.info("Selected RF band %i." % rf_band)
         self.config['band_sel'] = rf_band
         attens_new = self.cal._rf_atten_calc(self.config['rf_atten'])
+        #print '\nattens_new', attens_new
         for x in range(att_l + 1):  # Toggle switch, then attens (front->back)
             bitmap = bitmap_interm
             if x > 0:
@@ -263,7 +264,8 @@ class spec:
             else:           
                 self.fe_write(bitmap)
                 bitmap_check = bitmap
-        print bitmap
+        print 'ACU Ctrl bitmap:', numpy.binary_repr(bitmap),\
+                'length:', len(numpy.binary_repr(bitmap))
 
 
     def fe_write(self, bitmap, read=True):
@@ -704,9 +706,6 @@ class spec:
 
 
 
-
-
-
     def read_roach_spectrum(self):
         spectrum = numpy.zeros(self.config['n_chans'])
 
@@ -733,14 +732,14 @@ class spec:
 
 
     def noise_calibration_cam(self, last_acc_cnt=None, verbose=True,
-                              digital_spectrum=False, plot_cal=False,
+                              digital_spectrum=False, plot_cal=True,
                               default_file_path='./'):
         """
         Configures front-end for noise-source input, perform calibration
         measurements (OFF / ON), pass data to cal.py and safe relevant results to file.  
         """
         #print 'rf atten, strt of cam auto cal', self.config['rf_atten']
-        noise_cal_nap = self.config['acc_period'] * 2.2
+        noise_cal_nap = self.config['acc_period'] * 1.2
         #print '\nlast acc count:\t', last_acc_cnt
         if last_acc_cnt is None:
             last_acc_cnt = self.last_acc_cnt
@@ -750,7 +749,7 @@ class spec:
         cal_config = self.config['noise_source_on_layout'] +\
             self.config['input_switch_on_layout']  # ON measurement configuration
         #print '\ncal_config:\t%i\t(bin: %s)\n' %(cal_config, numpy.binary_repr(cal_config))
-        self.fe_set(cal_config=cal_config)
+        self.fe_set(cal_config=cal_config, gain=self.config['rf_atten'])
         time.sleep(noise_cal_nap)
         # rf_band=self.config['band_sel'], gain=self.config['rf_atten'],
         while self.fpga.read_uint('acc_cnt') <= (last_acc_cnt):
@@ -766,7 +765,7 @@ class spec:
         #print '\nduration 1, last_acc_cnt ', (time.time()-t1), last_acc_cnt
         t1 = time.time()
         # print "cal config:", cal_config
-        self.fe_set(cal_config=cal_config)
+        self.fe_set(cal_config=cal_config, gain=self.config['rf_atten'])
         time.sleep(noise_cal_nap)
         #  rf_band=self.config['band_sel'], gain=self.config['rf_atten'],
         #time.sleep(8)
@@ -783,7 +782,7 @@ class spec:
         if digital_spectrum:
             atten_setting=self.config['rf_atten']
             self.fe_set(gain=self.config['max_atten'],
-                        rf_band=self.config['band_sel'])
+                        rf_band=self.config['band_sel'], cal_config=cal_config)
             #print 'rf atten,  dig spec', self.config['rf_atten']
             time.sleep(noise_cal_nap)
             while self.fpga.read_uint('acc_cnt') <= (last_acc_cnt):
@@ -794,13 +793,15 @@ class spec:
             digital_spectrum =\
                 self.cal.calibrate_pfb_spectrum(digital_spectrum, noise_cal=True)
             #print '\nhot', time.time(), numpy.mean(digital_spectrum)
-        #print 'atten setting cam nc', atten_setting
-        self.fe_set(gain=atten_setting)
+        #print '\n\natten setting cam nc, end of routine', atten_setting
         tsys, gain, tsys_mean, gain_mean =\
             self.cal.noise_calibration_calculation(hot_spectrum, cold_spectrum,
                                                    digital_spectrum=digital_spectrum,
                                                    plot_cal=plot_cal,
                                                    default_file_path=default_file_path)
+        self.config['rf_atten'] = atten_setting
+        self.fe_set(rf_band=self.config['band_sel'], gain=self.config['rf_atten'],
+                    cal_config=False)  # return to external rf input TODO CHECK!
         #print '\nduration 2, last_acc_cnt ', (time.time()-t1), last_acc_cnt
         #print 'rf atten, end of cam auto cal', self.config['rf_atten']
         if verbose:   
@@ -812,8 +813,6 @@ class spec:
             print "Mean Tsys:\t%.2f K" %tsys_mean
             print "Mean in-band gain:\t%.2f dB\n\n" %(10*numpy.log10(gain_mean))
 
-        self.fe_set(rf_band=self.config['band_sel'], gain=self.config['rf_atten'],
-                    cal_config=False)  # return to external rf input TODO CHECK!
         return tsys, gain, tsys_mean, gain_mean 
             #  hot_spectrum, cold_spectrum, digital_spectrum
 
