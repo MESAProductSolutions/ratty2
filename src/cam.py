@@ -794,14 +794,14 @@ class spec:
                 self.cal.calibrate_pfb_spectrum(digital_spectrum, noise_cal=True)
             #print '\nhot', time.time(), numpy.mean(digital_spectrum)
         #print '\n\natten setting cam nc, end of routine', atten_setting
+        self.config['rf_atten'] = atten_setting
+        self.fe_set(rf_band=self.config['band_sel'], gain=self.config['rf_atten'],
+                    cal_config=False)  # return to external rf input TODO CHECK!
         tsys, gain, tsys_mean, gain_mean =\
             self.cal.noise_calibration_calculation(hot_spectrum, cold_spectrum,
                                                    digital_spectrum=digital_spectrum,
                                                    plot_cal=plot_cal,
                                                    default_file_path=default_file_path)
-        self.config['rf_atten'] = atten_setting
-        self.fe_set(rf_band=self.config['band_sel'], gain=self.config['rf_atten'],
-                    cal_config=False)  # return to external rf input TODO CHECK!
         #print '\nduration 2, last_acc_cnt ', (time.time()-t1), last_acc_cnt
         #print 'rf atten, end of cam auto cal', self.config['rf_atten']
         if verbose:   
