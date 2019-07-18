@@ -251,7 +251,6 @@ class spec:
         self.logger.info("Selected RF band %i." % rf_band)
         self.config['band_sel'] = rf_band
         attens_new = self.cal._rf_atten_calc(self.config['rf_atten'])
-        #print '\nattens_new', attens_new
         for x in range(att_l + 1):  # Toggle switch, then attens (front->back)
             bitmap = bitmap_interm
             if x > 0:
@@ -325,7 +324,7 @@ class spec:
         if not skip_program:
             if print_progress:
                 print '\
-                    \tConfiguring Valon frequency to %5.1f MHz...'\
+                    Configuring Valon frequency to %5.1f MHz...'\
                     % (self.config['sample_clk'] / 1e6),
 
                 sys.stdout.flush()
@@ -370,12 +369,12 @@ class spec:
                 print 'ok, %i MHz' % est_rate
 
         if print_progress: 
-            print '\tSelecting RF band %i (%i-%i MHz) and...\n\t\
-                adjusting attenuators for %4.1fdB total attenuation...' %\
-                (self.config['band_sel'],
-                 self.config['ignore_low_freq'] / 1.e6,
-                 self.config['ignore_high_freq'] / 1.e6,
-                 self.config['rf_atten']),
+            print '\tSelecting RF band %i (%i-%i MHz) and...\n'\
+                % (self.config['band_sel'],
+                   self.config['ignore_low_freq'] / 1.e6,
+                   self.config['ignore_high_freq'] / 1.e6) +\
+                '\tadjusting attenuators for %4.1fdB total attenuation...'\
+                 % self.config['rf_atten']
         self.fe_set()
         if print_progress:
             print 'ok'
@@ -482,7 +481,7 @@ class spec:
             #Wait until the next accumulation has been performed.
             time.sleep(0.1)
         spectrum = numpy.zeros(self.config['n_chans'])
-        spectrum = self.read_roach_spectrum()
+        spectrum, stat, ampls = self.read_roach_spectrum()
 
         #for i in range(self.config['n_par_streams']):
         #    spectrum[i::self.config['n_par_streams']] =\
@@ -495,7 +494,6 @@ class spec:
         #self.last_acc_cnt = self.fpga.read_uint('acc_cnt')
         #if self.config['flip_spectrum']:
         #    spectrum = spectrum[::-1]
-        #stat = self.status_get()
         #ampls = self.adc_amplitudes_get()
         #if stat['adc_shutdown']:
         #    self.logger.error('ADC selfprotect due to overrange!')
@@ -504,7 +502,7 @@ class spec:
         #elif stat['fft_overrange']:
         #    self.logger.error('FFT is overflowing!')
 
-        cal_spectrum = r.cal.calibrate_pfb_spectrum(spectrum)
+        cal_spectrum = self.cal.calibrate_pfb_spectrum(spectrum)
 
         return {'raw_spectrum': spectrum,
                 'calibrated_spectrum': cal_spectrum,
@@ -727,83 +725,202 @@ class spec:
             self.logger.warning('ADC is clipping!')
         elif stat['fft_overrange']:
             self.logger.error('FFT is overflowing!')
-        return spectrum
+        return spectrum, stat, ampls
 
+
+    def find_peaks(self, spec, plot_it=False, centre_span=12,
+                   offset_span=30, margin=5., off=3):
+        '''
+        Find peaks in spectrum and return flagged bins.
+        Two sweeping calculations are used, big and small spans.
+        Goals is to flag narrow and broader signals.
+        '''
+        if offset_span < off:  # avoid negative indices
+            off = 0.
+        margin_mid = margin * .5
+        peaks, margin_c, margin_ltr, margin_rtl, freqs = [], [], [], [], []
+        means, std, means_ltr, means_rtl, std_ltr, std_rtl =\
+            [], [], [], [], [], []
+        #testing = [2800, 3000, 5500, 10100, 20000, 27000]
+        for cnt in range(len(spec)):
+            if not(int(centre_span) < cnt < int(len(spec) - centre_span)):
+                continue  # only look within passband
+            else:
+                #big_mean = numpy.mean(spec[cnt-int(big_span / 2.):
+                #                           cnt+int(big_span / 2.)])
+                means.append(numpy.mean(spec[cnt-int(centre_span / 2.):
+                                             cnt+int(centre_span / 2.)]))
+                means_ltr.append(numpy.mean(spec[int(cnt - offset_span):cnt-off]))
+                means_rtl.append(numpy.mean(spec[cnt+off:int(cnt + offset_span)]))
+                std.append(numpy.std(spec[cnt-int(centre_span / 2.):
+                                          cnt+int(centre_span / 2.)]))
+                std_ltr.append(numpy.std(spec[int(cnt - offset_span):cnt-off]))
+                std_rtl.append(numpy.std(spec[cnt+off:int(cnt + offset_span)]))
+                margin_c.append(means[-1] + margin_mid * std[-1])
+                margin_ltr.append(means_ltr[-1] + margin * std_ltr[-1])
+                margin_rtl.append(means_rtl[-1] + margin * std_rtl[-1])
+                freqs.append(cnt)
+                #if cnt in testing:
+                    #print 'cnt, cnt - span/2, cnt + span/2',\
+                    #    cnt, cnt - int(small_span / 2.),\
+                    #    cnt + int(small_span * 2)
+                    #print 'freq_strt, freq_mid,freq_stp',\
+                    #    self.config['freqs'][cnt-int(small_span / 2.)],\
+                    #    self.config['freqs'][cnt],\
+                    #    self.config['freqs'][cnt + int(small_span / 2.)]
+                    #print 'mid-strt, end-strt',\
+                    #    (self.config['freqs'][cnt-int(small_span / 2.)]
+                    #     - self.config['freqs'][cnt]),\
+                    #    (self.config['freqs'][cnt] -
+                    #     self.config['freqs'][cnt + int(small_span / 2.)])
+                #big_std = numpy.std(spec[cnt-int(big_span / 2.):
+                #                           cnt+int(big_span / 2.)])
+                #small_std = numpy.std(spec[cnt-int(small_span / 2.):
+                #                             cnt+int(small_span / 2.)])
+            if (spec[cnt] - means[-1]) > margin_mid * std[-1] or\
+                (spec[cnt] - means_ltr[-1]) > margin * std_ltr[-1] or\
+                (spec[cnt] - means_rtl[-1]) > margin * std_rtl[-1]:
+                peaks.append(cnt)
+        #     if cnt in testing:
+        #         print '\n\nfreq:', self.config['freqs'][cnt] / 1.e6
+        #         print '\nspec - big_mean:', spec[cnt] - big_mean
+        #         print '\nmargin * big_std', margin * big_std
+        #         print '\nspec - small_mean', spec[cnt] - small_mean
+        #         print '\nmargin * small_std', margin * small_std
+        #         print 'over_all std', numpy.std(spec)
+        if plot_it:
+            import matplotlib.pyplot as plt
+            low_bin, high_bin = self.cal.find_ignore_freq_bins()
+            f, ax1 = plt.subplots(1, 1, figsize=(10, 6))
+            ax1.plot(self.config['freqs'] / 1.e6, spec, label='spectrum')
+            ax1.plot(numpy.array(self.config['freqs'][freqs]) / 1.e6, means,
+                     label='centred mean')
+            ax1.plot(numpy.array(self.config['freqs'][freqs]) / 1.e6, means_rtl,
+                     label='rtl mean')
+            ax1.plot(numpy.array(self.config['freqs'][freqs]) / 1.e6, means_ltr,
+                     label='ltr mean')
+            ax1.plot(self.config['freqs'][peaks] / 1.e6,
+                     spec[peaks], 'ro', label='RFI')
+            ax1.plot(numpy.array(self.config['freqs'][freqs]) / 1.e6,
+                     margin_c, '--', label='centre margin')
+            ax1.plot(numpy.array(self.config['freqs'][freqs]) / 1.e6,
+                     margin_rtl, '--', label='margin rtl')
+            ax1.plot(numpy.array(self.config['freqs'][freqs]) / 1.e6,
+                     margin_ltr, '--', label='margin ltr')
+            ax1.set_xlim(self.config['freqs'][low_bin] / 1.e6,
+                           self.config['freqs'][high_bin] / 1.e6)
+            ax1.set_ylim(numpy.min(spec[low_bin:high_bin]),
+                         numpy.max(spec[low_bin:high_bin]))
+            ax1.grid()
+            ax1.legend()
+            f.suptitle('RFI Flagging in RTA Digital-Noise Spectrum')
+
+            plt.show()
+        return peaks
+
+
+    def find_self_gen_RFI(self, integration_period=1., centre_span=12,
+                          offset_span=150, margin=4., offset=6,
+                          plot_it=False, verbose=False):
+        '''
+        Automated routine for flagging self-generated RFI
+        '''
+        atten_temp = self.config['rf_atten']
+        #bandpass_temp = self.config['system_bandpass']
+        self.fe_set(gain=self.config['max_atten'])
+        self.config['system_bandpass'] = 0.
+        n_captures = int(numpy.ceil(integration_period /
+                                    self.config['acc_period']))
+        if verbose:
+            print '\n-------------------------------------------\n' +\
+                '\nPerforming self-generated RFI Flagging' +\
+                ' (%.3fs of integration)...'\
+                % (self.config['acc_period'] * n_captures)
+        acc_spec = numpy.zeros(len(self.config['freqs']))
+        self.get_spectrum()  # read potential junk spectrum
+        for cnt in range(n_captures):
+            spec = self.get_spectrum()
+            acc_spec += 10. ** (spec['calibrated_spectrum'] / 10.)
+        acc_spec = 10 * numpy.log10(acc_spec / n_captures)
+        self.config['self_RFI_bins'] =\
+            self.find_peaks(acc_spec, centre_span=centre_span,
+                            offset_span=offset_span,
+                            margin=margin, plot_it=plot_it,
+                            off=offset)
+        self.fe_set(gain=atten_temp)
+        if verbose:
+            print '\n\n%i of %i bins flagged as self-generated RFI'\
+                % (len(self.config['self_RFI_bins']),
+                   len(self.config['freqs'])) +\
+                '\t(%.4f percent of spectral bins)\n\n'\
+                % (100 * float(len(self.config['self_RFI_bins'])) /
+                   len(self.config['freqs']))
+            print '\n-------------------------------------------\n'
+        return
 
 
     def noise_calibration_cam(self, last_acc_cnt=None, verbose=True,
-                              digital_spectrum=False, plot_cal=True,
+                              digital_spectrum=False, plot_cal=False,
                               default_file_path='./'):
         """
         Configures front-end for noise-source input, perform calibration
         measurements (OFF / ON), pass data to cal.py and safe relevant results to file.  
         """
-        #print 'rf atten, strt of cam auto cal', self.config['rf_atten']
-        noise_cal_nap = self.config['acc_period'] * 1.2
-        #print '\nlast acc count:\t', last_acc_cnt
-        if last_acc_cnt is None:
-            last_acc_cnt = self.last_acc_cnt
-        t1 = time.time()
-        #print '\nlast acc count:\t', last_acc_cnt
-        #print '\ntime 1, last_acc_cnt ', t1, last_acc_cnt
+        try:
+            if self.config['self_RFI_bins'] and verbose:
+                print '\nSelf-generated RFI already flagged.\n'
+        except KeyError:
+            self.find_self_gen_RFI()
+        #noise_cal_nap = self.config['acc_period'] * 2.2
         cal_config = self.config['noise_source_on_layout'] +\
             self.config['input_switch_on_layout']  # ON measurement configuration
-        #print '\ncal_config:\t%i\t(bin: %s)\n' %(cal_config, numpy.binary_repr(cal_config))
         self.fe_set(cal_config=cal_config, gain=self.config['rf_atten'])
-        time.sleep(noise_cal_nap)
-        # rf_band=self.config['band_sel'], gain=self.config['rf_atten'],
-        while self.fpga.read_uint('acc_cnt') <= (last_acc_cnt):
-            #Wait until the next accumulation has been performed.
-            time.sleep(0.1)
+        self.read_roach_spectrum()  # flush junk/transition spectrum
         self.last_acc_cnt = self.fpga.read_uint('acc_cnt')
-        print '\n\tself.last_acc_cnt 1) in cam noise cal cam:', self.last_acc_cnt
-        hot_spectrum = self.read_roach_spectrum()
-        #print '\nhot', time.time(), numpy.mean(hot_spectrum)
+        while self.fpga.read_uint('acc_cnt') <= (self.last_acc_cnt + 1):
+            time.sleep(0.1)  # Wait until the next accumulation has been performed.
+        hot_spectrum, stat, ampls = self.read_roach_spectrum()
         hot_spectrum = self.cal.calibrate_pfb_spectrum(hot_spectrum, noise_cal=True)
         cal_config -= self.config['noise_source_on_layout']  # OFF measurement configuration
-        #print '\ncal_config:\t%i\t(bin: %s)\n' %(cal_config, numpy.binary_repr(cal_config))
-        #print '\nduration 1, last_acc_cnt ', (time.time()-t1), last_acc_cnt
-        t1 = time.time()
-        # print "cal config:", cal_config
         self.fe_set(cal_config=cal_config, gain=self.config['rf_atten'])
-        time.sleep(noise_cal_nap)
-        #  rf_band=self.config['band_sel'], gain=self.config['rf_atten'],
-        #time.sleep(8)
-        while self.fpga.read_uint('acc_cnt') <= (last_acc_cnt):
-            time.sleep(0.1)  # Wait till next accumulation TODO check continuous impact
+        self.read_roach_spectrum()  # flush junk/transition spectrum
         self.last_acc_cnt = self.fpga.read_uint('acc_cnt')
-        print '\n\tself.last_acc_cnt 2) in cam noise cal cam:', self.last_acc_cnt
-        cold_spectrum = self.read_roach_spectrum()
+        while self.fpga.read_uint('acc_cnt') <= (self.last_acc_cnt + 1):  # clean
+            time.sleep(0.1)  # Wait till next accumulation TODO check continuous impact
+        cold_spectrum, stat, ampls = self.read_roach_spectrum()
         cold_spectrum = self.cal.calibrate_pfb_spectrum(cold_spectrum,
                                                         noise_cal=True)
-        #print '\nduration 2, last_acc_cnt ', (time.time()-t1), last_acc_cnt
-        #print '\ncold (time, mean (dB))', time.time(), numpy.mean(cold_spectrum) 
-        #print 'rf atten, before dig spec', self.config['rf_atten']
+        self.last_acc_cnt = self.fpga.read_uint('acc_cnt')
         if digital_spectrum:
             atten_setting=self.config['rf_atten']
             self.fe_set(gain=self.config['max_atten'],
                         rf_band=self.config['band_sel'], cal_config=cal_config)
-            #print 'rf atten,  dig spec', self.config['rf_atten']
-            time.sleep(noise_cal_nap)
+            self.read_roach_spectrum()  # flush junk/transition spectrum
             while self.fpga.read_uint('acc_cnt') <= (last_acc_cnt):
                 time.sleep(0.1)  # Wait till next accumulation
             self.last_acc_cnt = self.fpga.read_uint('acc_cnt')
-            print '\n\tself.last_acc_cnt 3) in cam noise cal cam:', self.last_acc_cnt
-            digital_spectrum = self.read_roach_spectrum()
+            digital_spectrum, stat, ampls = self.read_roach_spectrum()
             digital_spectrum =\
                 self.cal.calibrate_pfb_spectrum(digital_spectrum, noise_cal=True)
-            #print '\nhot', time.time(), numpy.mean(digital_spectrum)
-        #print '\n\natten setting cam nc, end of routine', atten_setting
-        self.config['rf_atten'] = atten_setting
+            self.config['rf_atten'] = atten_setting
         self.fe_set(rf_band=self.config['band_sel'], gain=self.config['rf_atten'],
                     cal_config=False)  # return to external rf input TODO CHECK!
-        tsys, gain, tsys_mean, gain_mean =\
-            self.cal.noise_calibration_calculation(hot_spectrum, cold_spectrum,
-                                                   digital_spectrum=digital_spectrum,
-                                                   plot_cal=plot_cal,
-                                                   default_file_path=default_file_path)
-        #print '\nduration 2, last_acc_cnt ', (time.time()-t1), last_acc_cnt
-        #print 'rf atten, end of cam auto cal', self.config['rf_atten']
+        tsys, gain, tsys_mean, gain_mean = self.cal.\
+            noise_calibration_calculation(self.cal.
+                                          omit_bins(hot_spectrum,
+                                                    self.config['self_RFI_bins']),
+                                          self.cal.
+                                          omit_bins(cold_spectrum,
+                                                    self.config['self_RFI_bins']),
+                                          digital_spectrum=
+                                          self.cal.
+                                          omit_bins(digital_spectrum,
+                                                    self.config['self_RFI_bins']),
+                                          plot_cal=plot_cal,
+                                          default_file_path=default_file_path)
+        self.last_acc_cnt = self.fpga.read_uint('acc_cnt')
+        while self.fpga.read_uint('acc_cnt') <= (self.last_acc_cnt + 1):  # clean
+            time.sleep(0.1)  # Wait till next accumulation
         if verbose:   
             pnt1 = 6666
             print '\n\nTsys @ %.2f Hz:\t%2f K' %(self.config['freqs'][pnt1],

@@ -498,6 +498,14 @@ class cal:
 
 
 
+    def omit_bins(self, data, omit):
+        try:
+            data = [e for i, e in enumerate(data) if i not in omit]
+            return numpy.array(data)
+        except TypeError:
+            return data
+
+
     def find_ignore_freq_bins(self):
         '''
         Determine bin numbers for the lower and upper frequency points to ignore 
@@ -517,7 +525,7 @@ class cal:
         return x_low, x_high
 
     
-    def calibrate_pfb_spectrum(self, spectrum,  noise_cal=False):
+    def calibrate_pfb_spectrum(self, spectrum, noise_cal=False):
         '''
         Apply calibration factors to RTA spectrum
         '''
@@ -549,14 +557,20 @@ class cal:
         noise_source_NF =\
             self.get_interpolated_gains(
                 cal_files(self.config['noise_source_calfile']))
-        tson = 10.**(noise_source_NF / 10.) * t0 + tamb  # Checked 
+        tson = 10. ** (self.omit_bins(noise_source_NF,
+                                      self.config['self_RFI_bins'])
+                       / 10.) * t0 + tamb  # Checked 
         y_fact = 10.**(hot_spectrum / 10.) / 10.**(cold_spectrum/10.)
         tsys = (tson - y_fact * tamb) / (y_fact - 1.)  # checked
-        ton = 10**((hot_spectrum - self.config['system_bandpass']
+        ton = 10**((hot_spectrum -
+                    self.omit_bins(self.config['system_bandpass'],
+                                   r.config['self_RFI_bins'])
                     - 30.) / 10.)\
             / (k * self.config['chan_width'])           
-        toff = 10**((cold_spectrum - self.config['system_bandpass']
-                    - 30.) / 10.)\
+        toff = 10**((cold_spectrum -
+                     self.omit_bins(self.config['system_bandpass'],
+                                    self.config['self_RFI_bins'])
+                     - 30.) / 10.)\
             / (k * self.config['chan_width'])
         y_fact_check = ton / toff  # alternative calculation as check
         gain = 10.**((hot_spectrum - 30.) / 10.)\
@@ -581,9 +595,9 @@ class cal:
         """Plot individual cal. measurement results and spectra."""
         import matplotlib.pyplot as plt
         if not(diff):
-            f, (ax1, ax2, ax3) = plt.subplots(3, 1, figsize=(12, 12))
+            f, (ax1, ax2, ax3) = plt.subplots(3, 1, figsize=(9, 9))
         else:
-            f, (ax1, ax2, ax3, ax4) = plt.subplots(4, 1, figsize=(12, 12))
+            f, (ax1, ax2, ax3, ax4) = plt.subplots(4, 1, figsize=(9, 9))
         ax1.plot(self.config['freqs'][low_bin:high_bin]/1.e6,
                  tsys[low_bin:high_bin])
         ax1.set_xlabel('Frequency (MHz)')
@@ -636,6 +650,6 @@ class cal:
                         '_min' + str(numpy.abs(self.config['rf_atten'])).split('.')[0] +
                         'dB_atten_auto_cal_spectra_and_results.png',
                         format="png", dpi=600)
-        #plt.show()
+        plt.show()
         plt.close()
         return
