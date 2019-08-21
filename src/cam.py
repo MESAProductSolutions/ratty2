@@ -43,7 +43,7 @@ class spec:
 
         self.cal = ratty2.cal.cal(logger=self.logger, **kwargs)
         self.config = self.cal.config
-
+        # print "CAM > ", self.config['ignore_low_freq'], self.config['ignore_high_freq']
         #skip the first accumulation (0), which contains junk.
         self.last_acc_cnt = 1
 
@@ -58,16 +58,24 @@ class spec:
         self.fpga = corr.katcp_wrapper.FpgaClient(
             self.config['roach_ip_str'],
             self.config['katcp_port'],
-            timeout=3,
+            timeout=4,
             logger=self.logger)
-        time.sleep(0.2)
+        time.sleep(0.4)
         try:
-            self.fpga.ping()
-            self.logger.info('KATCP connection to FPGA ok.')
+            success = self.fpga.ping()
+            if success:
+                self.logger.info('KATCP connection to FPGA ok.')
+                return True
+            else:
+                self.logger.error(
+                    'KATCP connection failure. Connection to ROACH failed.')
+                raise RuntimeError("Connection to FPGA board failed.")
+                return False
         except:
             self.logger.error(
                 'KATCP connection failure. Connection to ROACH failed.')
             raise RuntimeError("Connection to FPGA board failed.")
+            return False
 
     def auto_gain(self, print_progress=False):
         """
@@ -259,6 +267,8 @@ class spec:
             else:
                 self.fe_write(bitmap)
                 bitmap_check = bitmap
+        print bitmap
+
 
     def fe_write(self, bitmap, read=True):
         '''
@@ -472,7 +482,7 @@ class spec:
 
         while self.fpga.read_uint('acc_cnt') <= (last_acc_cnt):
             #Wait until the next accumulation has been performed.
-            time.sleep(0.1)
+            time.sleep(0.3)
         spectrum = numpy.zeros(self.config['n_chans'])
 
         for i in range(self.config['n_par_streams']):
