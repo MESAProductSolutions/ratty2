@@ -564,7 +564,7 @@ class cal:
         tsys = (tson - y_fact * tamb) / (y_fact - 1.)  # checked
         ton = 10**((hot_spectrum -
                     self.omit_bins(self.config['system_bandpass'],
-                                   r.config['self_RFI_bins'])
+                                   self.config['self_RFI_bins'])
                     - 30.) / 10.)\
             / (k * self.config['chan_width'])           
         toff = 10**((cold_spectrum -
