@@ -866,6 +866,7 @@ class spec:
         Configures front-end for noise-source input, perform calibration
         measurements (OFF / ON), pass data to cal.py and safe relevant results to file.  
         """
+        # TODO add accumulation period for calibration routine
         try:
             if self.config['self_RFI_bins'] and verbose:
                 print '\nSelf-generated RFI already flagged.\n'
