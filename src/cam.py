@@ -323,9 +323,8 @@ class spec:
         """Initialises the system to defaults."""
         if not skip_program:
             if print_progress:
-                print '\
-                    Configuring Valon frequency to %5.1f MHz...'\
-                    % (self.config['sample_clk'] / 1e6),
+                print '\tConfiguring Valon frequency to %5.1f MHz...'\
+                        % (self.config['sample_clk'] / 1e6),
 
                 sys.stdout.flush()
 
@@ -865,6 +864,7 @@ class spec:
         """
         Configures front-end for noise-source input, perform calibration
         measurements (OFF / ON), pass data to cal.py and safe relevant results to file.  
+        Manual mode for manual toggling of noise source.
         """
         # TODO add accumulation period for calibration routine
         try:
@@ -873,24 +873,30 @@ class spec:
         except KeyError:
             self.find_self_gen_RFI()
         #noise_cal_nap = self.config['acc_period'] * 2.2
-        cal_config = self.config['noise_source_on_layout'] +\
-            self.config['input_switch_on_layout']  # ON measurement configuration
+        #cal_config = self.config['noise_source_on_layout'] +\
+        #    self.config['input_switch_on_layout']  # ON measurement configuration
+        cal_config = self.config['input_switch_on_layout']  # Cold Cal. config.
         self.fe_set(cal_config=cal_config, gain=self.config['rf_atten'])
         self.read_roach_spectrum()  # flush junk/transition spectrum
         self.last_acc_cnt = self.fpga.read_uint('acc_cnt')
         while self.fpga.read_uint('acc_cnt') <= (self.last_acc_cnt + 1):
             time.sleep(0.1)  # Wait until the next accumulation has been performed.
-        hot_spectrum, stat, ampls = self.read_roach_spectrum()
-        hot_spectrum = self.cal.calibrate_pfb_spectrum(hot_spectrum, noise_cal=True)
-        cal_config -= self.config['noise_source_on_layout']  # OFF measurement configuration
+        cold_spectrum, stat, ampls = self.read_roach_spectrum()
+        cold_spectrum = self.cal.calibrate_pfb_spectrum(cold_spectrum,
+                                                        noise_cal=True)
+        #hot_spectrum, stat, ampls = self.read_roach_spectrum()
+        #hot_spectrum = self.cal.calibrate_pfb_spectrum(hot_spectrum, noise_cal=True)
+        cal_config += self.config['noise_source_on_layout']  # OFF measurement configuration
         self.fe_set(cal_config=cal_config, gain=self.config['rf_atten'])
         self.read_roach_spectrum()  # flush junk/transition spectrum
         self.last_acc_cnt = self.fpga.read_uint('acc_cnt')
         while self.fpga.read_uint('acc_cnt') <= (self.last_acc_cnt + 1):  # clean
             time.sleep(0.1)  # Wait till next accumulation TODO check continuous impact
-        cold_spectrum, stat, ampls = self.read_roach_spectrum()
-        cold_spectrum = self.cal.calibrate_pfb_spectrum(cold_spectrum,
-                                                        noise_cal=True)
+        hot_spectrum, stat, ampls = self.read_roach_spectrum()
+        hot_spectrum = self.cal.calibrate_pfb_spectrum(hot_spectrum, noise_cal=True)
+        #cold_spectrum, stat, ampls = self.read_roach_spectrum()
+        #cold_spectrum = self.cal.calibrate_pfb_spectrum(cold_spectrum,
+        #                                                noise_cal=True)
         self.last_acc_cnt = self.fpga.read_uint('acc_cnt')
         if digital_spectrum:
             atten_setting=self.config['rf_atten']
