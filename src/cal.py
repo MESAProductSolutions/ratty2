@@ -206,17 +206,13 @@ class cal:
 
         self.config['nyquist_zone'] =\
             int(numpy.ceil(
-                (self.config['ignore_high_freq'
-                             ]+self.config['ignore_low_freq'
-                                           ])/2/(self.config['bandwidth'])))
-
+                (self.config['ignore_high_freq']+self.config['ignore_low_freq'])/2/(self.config['bandwidth'])))
         if bool(self.config['nyquist_zone'] & 1):
             self.config['flip_spectrum'] = False
             self.chan_offset = 0
         else:
             self.config['flip_spectrum'] = True
             self.chan_offset = self.config['bandwidth']/self.config['n_chans']
-
         # self.start_freq =\  # TODO Remove this chunk?
         #     (self.config['nyquist_zone']-1)*self.config['bandwidth'] +\
         #     chan_offset
@@ -248,6 +244,7 @@ class cal:
         #Override any defaults:
         for key in kwargs:
             self.config[key] = kwargs[key]
+        # print "#!#!#!# INIT > CAL >", self.config['ignore_low_freq'], self.config['ignore_high_freq']
 
 
     def generate_freqs(self, n_chans): 
@@ -261,6 +258,7 @@ class cal:
                                               stop_freq,
                                               n_chans,
                                               endpoint=False)
+
 
     def update_atten_bandpass(self, gain):
         """
@@ -276,7 +274,6 @@ class cal:
         if (self.config['system_bandpass_calfile'] != 'none'):
             self.config['system_bandpass'] = self.get_interpolated_attens(
                 filename=self.config['system_bandpass_calfile'],
-                #PARALLEL ATTENUATORS
                 atten_db=self.config['rf_atten'],
                 freqs_hz=self.config['freqs'])
         else:
@@ -386,11 +383,16 @@ class cal:
             except:
                 more = False
                 break
-            if float(atten_db) == float(raw_line['setpoint_db']):
+            if abs(float(atten_db) - float(raw_line['setpoint_db'])) < 1E-4:
+                # print "interpolated_attens >>> setpoint = TRUE", float(atten_db), float(raw_line['setpoint_db'])
                 for pair in raw_line['freq_hz:measured_gain_db'].split(';'):
                     freq, gain = pair.split(':')
                     freqs.append(float(freq))
                     gains.append(float(gain))
+        # print "CAL INTERPOLOATED_ATTENS>>>"
+        # print atten_db, float(atten_db)
+        # print numpy.shape(freqs)
+        # print numpy.shape(freqs_hz)
         if not(freqs[0] <= freqs_hz[0]):
             freqs.insert(0, 0.0)
             gains.insert(0, gains[0])
@@ -443,20 +445,27 @@ class cal:
         perform any frequency-dependent calibration.
         """
         x_low = x_high = None
-        for x in range(len(self.config['freqs'])):
-            if float(self.config['freqs'][x]) >\
-                float(self.config['ignore_low_freq']) and\
-                    (x_low is None):
-                x_low = x
-            elif float(self.config['freqs'][x]) >\
-                float(self.config['ignore_high_freq']) or\
-                (x == (len(self.config['freqs'])-1)):
-                x_high = x
-                passband_mean =\
-                    numpy.mean(self.config['system_bandpass'][x_low:x_high])
-                break
-
-        return 1./(10.**(passband_mean/20.))
+        # print ">>>> SCALE FACTOR >>>>"
+        x_low =  self.freq_to_chan(self.config['ignore_low_freq'])
+        x_high =  self.freq_to_chan(self.config['ignore_high_freq'])
+        # print x_low, x_high, self.config['ignore_low_freq'], self.config['ignore_high_freq']
+        # print "<<<<>>>>"
+        # for x in range(len(self.config['freqs'])):
+        #     if float(self.config['freqs'][x]) >\
+        #         float(self.config['ignore_low_freq']) and\
+        #             (x_low is None):
+        #         x_low = x
+        #         print "->-> x_low = ", x_low, " ignore_low = ", self.config['ignore_low_freq']
+        #     elif float(self.config['freqs'][x]) >\
+        #         float(self.config['ignore_high_freq']) or\
+        #         (x == (len(self.config['freqs'])-1)):
+        #         x_high = x
+        #         print "->-> x_high = ", x_high, " ignore_high = ", self.config['ignore_high_freq']
+        #         passband_mean =\
+        #             numpy.mean(self.config['system_bandpass'][x_low:x_high])
+        #         break
+        # return 1./(10.**(passband_mean/20.))
+        return 1./(10.**(numpy.mean(self.config['system_bandpass'][x_low:x_high])/20.))
 
     def calibrate_adc_snapshot(self, raw_data):
         """
@@ -469,6 +478,9 @@ class cal:
         ret['adc_mixed'] = numpy.array(raw_data)
         if self.config['flip_spectrum']:
             ret['adc_mixed'][::2] *= -1
+        # print "@@@@@@@@@@ ADC SNAPSHOT @@@@@@@@@@@@@"
+        # print self.get_input_scale_factor()
+        # print self.config['adc_v_scale_factor']
         ret['adc_v'] = ret['adc_mixed']*self.config['adc_v_scale_factor']
         ret['input_v'] = ret['adc_v']*self.get_input_scale_factor()
         n_accs = len(raw_data)/self.config['n_chans']/2

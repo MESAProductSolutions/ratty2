@@ -25,7 +25,9 @@ cal_file_path = "/etc/ratty2/cal_files/"
 class rattyconf:
     def __init__(self, **kwargs):
         self.config_file = kwargs['config_file']
-        self.cp = iniparse.INIConfig(open(self.config_file, 'rb'))
+        f = open(self.config_file, 'rb')
+        self.cp = iniparse.INIConfig(f)
+        f.close()
         self.config = kwargs
         self.read_common()
         self.config.update(kwargs)
