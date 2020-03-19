@@ -741,6 +741,10 @@ class spec:
         Find peaks in spectrum and return flagged bins.
         Two sweeping calculations are used, big and small spans.
         Goals is to flag narrow and broader signals.
+        AJO Code:
+        med_spec = sig.medfilt(spectrum[a], 151)
+        norm_spec = spectrum[a] - med_spec
+        freq_list.append(np.where(norm_spec >= 0.5, False, True))
         '''
         if offset_span < off:  # avoid negative indices
             off = 0.
@@ -831,10 +835,12 @@ class spec:
                           plot_it=False, verbose=False):
         '''
         Automated routine for flagging self-generated RFI
+
         '''
         atten_temp = self.config['rf_atten']
         #bandpass_temp = self.config['system_bandpass']
-        self.fe_set(gain=self.config['max_atten'])
+        self.fe_set(cal_config=self.config['input_switch_on_layout'],
+                     gain=self.config['max_atten'])  # RFI @ max att.
         self.config['system_bandpass'] = 0.
         n_captures = int(numpy.ceil(integration_period /
                                     self.config['acc_period']))
@@ -845,15 +851,59 @@ class spec:
                 % (self.config['acc_period'] * n_captures)
         acc_spec = numpy.zeros(len(self.config['freqs']))
         self.get_spectrum()  # read potential junk spectrum
-        for cnt in range(n_captures):
+        tries = 0
+        while cnt < n_captures:
             spec = self.get_spectrum()
+            if spec['adc_overrange'] or spec['fft_overrange']:
+                if tries == 3:
+                    print "\nRFI Flagging failed due to repeated overranges!\n"
+                    exit()
+                else:
+                    tries += 1
+                    continue
+                if verbose:
+                    print "\nOverrange in Flagging integration!\tRETRY!!!\n"
             acc_spec += 10. ** (spec['calibrated_spectrum'] / 10.)
+            cnt = cnt + 1
         acc_spec = 10 * numpy.log10(acc_spec / n_captures)
-        self.config['self_RFI_bins'] =\
+        RFI_bins_max_atten =\
             self.find_peaks(acc_spec, centre_span=centre_span,
                             offset_span=offset_span,
                             margin=margin, plot_it=plot_it,
                             off=offset)
+        self.fe_set(cal_config=self.config['input_switch_on_layout'],
+                    gain=0)  # RFI @ min att.
+        acc_spec = numpy.zeros(len(self.config['freqs']))
+        self.get_spectrum()  # read potential junk spectrum
+        tries = 0
+        while cnt < n_captures:
+            spec = self.get_spectrum()
+            if spec['adc_overrange'] or spec['fft_overrange']:
+                if tries == 3:
+                    print "\nRFI Flagging failed due to repeated overranges!\n"
+                    exit()
+                else:
+                    tries += 1
+                    continue
+                if verbose:
+                    print "\nOverrange in Flagging integration!\tRETRY!!!\n"
+            acc_spec += 10. ** (spec['calibrated_spectrum'] / 10.)
+            cnt = cnt + 1
+        acc_spec = 10 * numpy.log10(acc_spec / n_captures)
+        RFI_bins_min_atten =\
+            self.find_peaks(acc_spec, centre_span=centre_span,
+                            offset_span=offset_span,
+                            margin=margin, plot_it=plot_it,
+                            off=offset)
+        print 'len rfi bins min atten, BEFORE redux:', len(RFI_bins_min_atten)
+        RFI_bins_min_atten = [entry for entry in RFI_bins_min_atten
+                              if not(entry in RFI_bins_max_atten)]
+        print 'len rfi bins min atten, AFTER redux:', len(RFI_bins_min_atten)
+        self.config['self_RFI_bins'] =\
+            numpy.array(RFI_bins_max_atten + RFI_bins_min_atten)
+        print '\n\nlen bins max atten:\t', len(RFI_bins_max_atten),\
+            'len bins min atten:\t', len(RFI_bins_min_atten),\
+            'len config RFI bins', self.config['self_RFI_bins']
         self.fe_set(gain=atten_temp)
         if verbose:
             print '\n\n%i of %i bins flagged as self-generated RFI'\
