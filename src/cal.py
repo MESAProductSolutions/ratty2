@@ -375,10 +375,6 @@ class cal:
                     freq, gain = pair.split(':')
                     freqs.append(float(freq))
                     gains.append(float(gain))
-        # print "CAL INTERPOLOATED_ATTENS>>>"
-        # print atten_db, float(atten_db)
-        # print numpy.shape(freqs)
-        # print numpy.shape(freqs_hz)
         if not(freqs[0] <= freqs_hz[0]):
             freqs.insert(0, 0.0)
             gains.insert(0, gains[0])

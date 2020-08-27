@@ -239,14 +239,14 @@ class spec:
             for (att, atten) in enumerate(reversed(attens_interm)):
                 bitmap += (int(-atten * 2)) <<\
                     (switch_bitmap_offset + (6 * int(len(attens) - 1 - att)))
-            if initial:
-                bitmap = 2 ** 32 - 1
+            if initial:  # Attenuation configuration during initialisation
+                bitmap = 2 ** 32 - 1  # All high
                 self.fe_write(bitmap)
                 bitmap_check = bitmap
                 break
-            elif bitmap == bitmap_check:
+            elif bitmap == bitmap_check:  #  Configuration remains unchanged?
                 continue
-            else:
+            else:  #  Write new configuration
                 self.fe_write(bitmap)
                 bitmap_check = bitmap
         self.cal.update_atten_bandpass(gain=gain)  # updates config['rf_atten']
@@ -256,18 +256,18 @@ class spec:
         self.config['band_sel'] = rf_band
         attens_new = self.cal._rf_atten_calc(self.config['rf_atten'])
         for x in range(att_l + 1):  # Toggle switch, then attens (front->back)
-            bitmap = bitmap_interm
+            bitmap = bitmap_interm 
             if x > 0:
                 attens[x - 1] = attens_new[x - 1]
             for (att, atten) in enumerate(attens):
                 bitmap += ((int(-atten * 2))) <<\
-                    (switch_bitmap_offset + (6 * int(len(attens) - 1 - att)))
+                    (switch_bitmap_offset + (6 * att))
             if bitmap == bitmap_check:
                 continue
             else:           
                 self.fe_write(bitmap)
-                bitmap_check = bitmap
-        print bitmap
+                bitmap_check = bitmap 
+        print 'ACU control bitmap:\t', bin(bitmap)
 
 
     def fe_write(self, bitmap, read=True):
